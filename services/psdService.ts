@@ -450,10 +450,10 @@ export const compositePayloadToCanvas = async (payload: TransformedPayload, psd:
     }
 
     const drawLayers = async (layers: TransformedLayer[], depth = 0) => {
-        // Iterate in Reverse Order (Length-1 to 0) to maintain Painter's Algorithm.
-        // In ag-psd/Photoshop structure, index 0 is typically the Top-Most layer.
-        // Therefore, we must draw the Bottom-Most (last index) first.
-        for (let i = layers.length - 1; i >= 0; i--) {
+        // CHANGED: Iterate Forward (0 to Length-1) to implement Bottom-to-Top Painter's Algorithm.
+        // Index 0 is treated as the bottom-most layer, drawn first.
+        // This resolves the visual inversion where top layers were being drawn behind bottom layers.
+        for (let i = 0; i < layers.length; i++) {
             const layer = layers[i];
             
             // DIAGNOSTIC FORCE OPACITY
