@@ -318,20 +318,46 @@ export const ExportPSDNode = memo(({ id }: NodeProps) => {
         for (const metaLayer of transformedLayers) {
             let newLayer: Layer | undefined;
 
-            // BRANCH 1: Generative Layer (Synthetic)
+            // BRANCH 1: Generative Layer (Synthetic or Surgical Swap)
             if (metaLayer.type === 'generative') {
                 const asset = assets.get(metaLayer.id);
+                
+                // SURGICAL LOGIC: Check if this "generative" ID actually matches a real layer in the source
+                // If so, we must perform a swap while preserving metadata.
+                const originalLayer = sourcePsd ? findLayerByPath(sourcePsd, metaLayer.id) : null;
+
                 if (asset) {
-                    newLayer = {
-                        name: metaLayer.name,
-                        top: metaLayer.coords.y,
-                        left: metaLayer.coords.x,
-                        bottom: metaLayer.coords.y + metaLayer.coords.h,
-                        right: metaLayer.coords.x + metaLayer.coords.w,
-                        hidden: !metaLayer.isVisible,
-                        opacity: metaLayer.opacity * 255,
-                        canvas: asset // Inject synthetic pixel data
-                    };
+                    if (originalLayer) {
+                        // CASE A: SURGICAL SWAP (Re-use container, inject pixels)
+                        newLayer = {
+                            ...originalLayer, // Inherit Blend Modes, Layer Masks (if any), etc.
+                            // Override Geometry & Content
+                            name: metaLayer.name,
+                            top: metaLayer.coords.y,
+                            left: metaLayer.coords.x,
+                            bottom: metaLayer.coords.y + metaLayer.coords.h,
+                            right: metaLayer.coords.x + metaLayer.coords.w,
+                            hidden: !metaLayer.isVisible,
+                            opacity: metaLayer.opacity * 255,
+                            // CRITICAL: Overwrite canvas with AI asset
+                            canvas: asset, 
+                            // CRITICAL: Flatten hierarchy if swapped node was a group
+                            children: undefined,
+                            opened: false
+                        };
+                    } else {
+                        // CASE B: ADDITIVE SYNTHESIS (New Node)
+                        newLayer = {
+                            name: metaLayer.name,
+                            top: metaLayer.coords.y,
+                            left: metaLayer.coords.x,
+                            bottom: metaLayer.coords.y + metaLayer.coords.h,
+                            right: metaLayer.coords.x + metaLayer.coords.w,
+                            hidden: !metaLayer.isVisible,
+                            opacity: metaLayer.opacity * 255,
+                            canvas: asset
+                        };
+                    }
                 }
             } 
             // BRANCH 2: Standard Layer (Clone + Raster Transform)

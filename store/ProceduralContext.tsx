@@ -58,8 +58,9 @@ const reconcileTerminalState = (
 ): TransformedPayload => {
 
     // 0. GENERATIVE LOGIC GATE: HARD STOP
-    // If generation is explicitly disallowed (per-instance toggle), we must strip all generative assets immediately.
-    // This acts as a "Kill Switch" for the pipeline's specific instance.
+    // If generation is explicitly disallowed (per-instance toggle), we must strip purely synthetic assets.
+    // SURGICAL UPDATE: We must NOT delete layers that were "Swapped" (changed from Pixel -> Gen).
+    // Swapped layers retain their original IDs (e.g., "0.3.1"). Additive layers use synthetic IDs ("gen-layer-...").
     if (incomingPayload.generationAllowed === false) {
         return {
             ...incomingPayload,
@@ -71,8 +72,13 @@ const reconcileTerminalState = (
             requiresGeneration: false, // Ensure downstream nodes know generation is off
             // Preserve geometric data
             metrics: incomingPayload.metrics,
-            // Visually remove any layers marked as generative
-            layers: incomingPayload.layers.filter(l => l.type !== 'generative') 
+            // FILTER LOGIC:
+            // Remove 'generative' layers ONLY IF they are purely additive (start with 'gen-layer-').
+            // Swapped layers (with original IDs) are kept. If they are type='generative', they render as placeholders,
+            // which is safer than deleting the entire node from the tree.
+            layers: incomingPayload.layers.filter(l => 
+                l.type !== 'generative' || (l.id && !l.id.startsWith('gen-layer-'))
+            ) 
         };
     }
 

@@ -28,7 +28,6 @@ interface InstanceData {
 }
 
 // --- SUB-COMPONENT: Generative Preview Overlay ---
-// (No changes to Overlay component, reused from previous state)
 interface OverlayProps {
     previewUrl?: string | null;
     canonicalUrl?: string | null; 
@@ -532,6 +531,20 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                         let layerScaleX = scale;
                         let layerScaleY = scale;
                         
+                        // SURGICAL SWAP LOGIC
+                        // If generation is active, and this layer is the designated swap target...
+                        if (effectiveAllowed && strategy?.replaceLayerId === layer.id) {
+                            // ...we perform an IN-PLACE mutation to 'generative' type
+                            return {
+                                ...layer,
+                                type: 'generative', // Metamorphosis: Pixel -> Generative
+                                generativePrompt: strategy.generativePrompt, // Attach intent
+                                coords: { x: targetRect.x, y: targetRect.y, w: targetRect.w, h: targetRect.h }, // Swap usually implies filling target context
+                                transform: { scaleX: 1, scaleY: 1, offsetX: targetRect.x, offsetY: targetRect.y },
+                                children: undefined // Flatten children (texture replacement)
+                            };
+                        }
+                        
                         let override = strategy?.overrides?.find(o => o.layerId === layer.id);
 
                         // STRUCTURAL BUNDLING LOGIC
@@ -564,7 +577,6 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                 
                 let requiresGeneration = false;
                 let status: TransformedPayload['status'] = 'success';
-                let generativePromptUsed = null;
                 const currentPrompt = strategy?.generativePrompt;
                 
                 // MANDATORY AUTO-CONFIRM CHECK (Client-side view prediction)
@@ -573,28 +585,17 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                 // If mandatory, we treat it as implicitly confirmed for the purpose of generation init
                 const isConfirmed = isMandatory || (!!currentPrompt && currentPrompt === confirmedPrompt);
 
-                if (currentPrompt) {
+                if (currentPrompt && effectiveAllowed) {
                     if (isConfirmed) {
                         requiresGeneration = true;
-                        generativePromptUsed = currentPrompt;
                         status = 'success';
                     } else if (strategy?.isExplicitIntent || scale > 2.0) {
                         status = 'awaiting_confirmation';
                     }
                 }
 
-                if (requiresGeneration && generativePromptUsed) {
-                    transformedLayers.unshift({
-                        id: `gen-layer-${sourceData.name || 'unknown'}`,
-                        name: `✨ AI Gen: ${generativePromptUsed.substring(0, 20)}...`,
-                        type: 'generative',
-                        isVisible: true,
-                        opacity: 1,
-                        coords: { x: targetRect.x, y: targetRect.y, w: targetRect.w, h: targetRect.h },
-                        transform: { scaleX: 1, scaleY: 1, offsetX: targetRect.x, offsetY: targetRect.y },
-                        generativePrompt: generativePromptUsed
-                    });
-                }
+                // REMOVED: Old unshift() logic for "Added" layers. 
+                // The Surgical Swap now handles insertion via recursive replacement above.
                 
                 const storePayload = payloadRegistry[id]?.[`result-out-${i}`];
                 payload = {
@@ -615,7 +616,8 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                     isSynthesizing: storePayload?.isSynthesizing,
                     generationAllowed: effectiveAllowed,
                     directives: strategy?.directives, // Propagate Directives
-                    isMandatory: isMandatory // Propagate Mandatory Flag
+                    isMandatory: isMandatory, // Propagate Mandatory Flag
+                    replaceLayerId: strategy?.replaceLayerId // Track swapped ID
                 };
             }
             result.push({ index: i, source: sourceData, target: targetData, payload, strategyUsed });

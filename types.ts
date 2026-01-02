@@ -93,7 +93,7 @@ export interface LayoutStrategy {
   reasoning: string;
   overrides?: LayerOverride[];
   directives?: string[]; // Phase 4B: Mandatory Knowledge Directives (e.g. MANDATORY_GEN_FILL)
-  replaceLayerId?: string; // Phase 4C: Surgical Swap Target ID
+  replaceLayerId?: string | null; // Phase 4C: Surgical Swap Target ID (Nullable)
   safetyReport?: {
     allowedBleed: boolean;
     violationCount: number;
@@ -194,6 +194,9 @@ export interface TransformedPayload {
   // Phase 4B: Procedural Enforcement
   directives?: string[]; 
   isMandatory?: boolean; // True if Generation is forced by Directive
+  
+  // Phase 4C: Surgical Logic
+  replaceLayerId?: string | null; // Track if a specific layer was swapped
 }
 
 export interface RemapperConfig {
