@@ -315,8 +315,20 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
   const { setNodes } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
   const { payloadRegistry, psdRegistry, unregisterNode } = useProceduralStore();
+  const rootRef = useRef<HTMLDivElement>(null);
   
   const edges = useEdges();
+
+  // ResizeObserver to handle dynamic content height changes (like chat expanding)
+  useEffect(() => {
+    if (rootRef.current) {
+        const observer = new ResizeObserver(() => {
+            updateNodeInternals(id);
+        });
+        observer.observe(rootRef.current);
+        return () => observer.disconnect();
+    }
+  }, [id, updateNodeInternals]);
 
   useEffect(() => {
     updateNodeInternals(id);
@@ -486,7 +498,7 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
   return (
     // ROOT: Removed overflow-hidden to allow handles to peek out. Added relative.
     // Changed fixed width to w-full h-full to support resizing.
-    <div className="w-full h-full bg-slate-900 rounded-lg shadow-2xl border border-emerald-500/50 font-sans flex flex-col relative transition-all hover:shadow-emerald-900/20 hover:border-emerald-400 group">
+    <div ref={rootRef} className="w-full h-full bg-slate-900 rounded-lg shadow-2xl border border-emerald-500/50 font-sans flex flex-col relative transition-all hover:shadow-emerald-900/20 hover:border-emerald-400 group">
       <NodeResizer 
         minWidth={400} 
         minHeight={300} 

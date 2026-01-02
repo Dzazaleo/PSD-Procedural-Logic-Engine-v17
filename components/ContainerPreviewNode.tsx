@@ -3,7 +3,7 @@ import { Handle, Position, NodeProps, useEdges, NodeResizer, useUpdateNodeIntern
 import { PSDNodeData, TransformedPayload } from '../types';
 import { useProceduralStore } from '../store/ProceduralContext';
 import { compositePayloadToCanvas } from '../services/psdService';
-import { Eye, Layers, Maximize, Scan, RotateCw, ShieldCheck, FileWarning, Plus } from 'lucide-react';
+import { Eye, Layers, Maximize, Scan, RotateCw, ShieldCheck, FileWarning, Plus, MonitorPlay } from 'lucide-react';
 
 // --- SUB-COMPONENT: Preview Instance Row ---
 const PreviewInstanceRow = memo(({ index, nodeId }: { index: number, nodeId: string }) => {
@@ -121,54 +121,52 @@ const PreviewInstanceRow = memo(({ index, nodeId }: { index: number, nodeId: str
     const targetH = incomingPayload ? (incomingPayload.targetBounds?.h ?? incomingPayload.metrics.target.h) : 0;
 
     return (
-        <div className="relative border-b border-emerald-900/30 bg-slate-900/40 p-2 flex flex-col space-y-2 first:rounded-t-none">
+        <div className="relative border-b border-emerald-900/30 bg-slate-900/20 p-2 flex flex-col space-y-2 first:rounded-t-none">
             {/* ABSOLUTE DOCKED HANDLES (Left Edge) */}
             <Handle 
                 type="target" 
                 position={Position.Left} 
                 id={`payload-in-${index}`} 
-                className="!absolute !-left-1.5 !top-12 !w-3 !h-3 !rounded-full !bg-indigo-500 !border-2 !border-slate-900 z-50" 
+                className="!absolute !-left-1.5 !top-12 !w-3 !h-3 !rounded-full !bg-indigo-500 !border-2 !border-slate-900 z-50 hover:scale-125 transition-transform" 
                 title="Input: Transformed Payload" 
             />
             <Handle 
                 type="target" 
                 position={Position.Left} 
                 id={`target-in-${index}`} 
-                className="!absolute !-left-1.5 !top-20 !w-3 !h-3 !rounded-full !bg-emerald-500 !border-2 !border-slate-900 z-50" 
+                className="!absolute !-left-1.5 !top-20 !w-3 !h-3 !rounded-full !bg-emerald-500 !border-2 !border-slate-900 z-50 hover:scale-125 transition-transform" 
                 title="Input: Target Definition" 
             />
 
             {/* Row Header */}
-            <div className="flex items-center justify-between px-2 pt-1">
+            <div className="flex items-center justify-between px-2 pt-1 h-8">
                 <div className="flex items-center space-x-2">
                     <div className={`w-2 h-2 rounded-full ${incomingPayload ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-slate-700'}`}></div>
-                    <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest truncate max-w-[150px]">
+                    <span className="text-[11px] font-bold text-emerald-100 uppercase tracking-widest truncate max-w-[200px]">
                         {incomingPayload?.targetContainer || `Monitor ${index + 1}`}
                     </span>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 relative">
                      {isPolished && (
                          <span className="flex items-center gap-1 text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-bold uppercase tracking-widest backdrop-blur-sm">
-                             <ShieldCheck className="w-2.5 h-2.5" /> Polished
+                             <ShieldCheck className="w-2.5 h-2.5" /> Verified
                          </span>
                      )}
                      
-                     {/* ABSOLUTE OUTPUT HANDLE (Upper Right of Row) */}
-                     <div className="relative w-3 h-3">
-                        <Handle 
-                            type="source" 
-                            position={Position.Right} 
-                            id={`payload-out-${index}`} 
-                            className="!absolute !-right-1.5 !top-1/2 !-translate-y-1/2 !w-2.5 !h-2.5 !rounded-full !bg-emerald-500 !border-2 !border-slate-800 shadow-[0_0_8px_rgba(16,185,129,0.5)] z-50" 
-                            title="Output: Validated Payload" 
-                        />
-                     </div>
+                     {/* ABSOLUTE OUTPUT HANDLE (Right Edge - Top Aligned in Row) */}
+                     <Handle 
+                        type="source" 
+                        position={Position.Right} 
+                        id={`payload-out-${index}`} 
+                        className="!absolute !-right-3.5 !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !bg-emerald-500 !border-2 !border-slate-800 shadow-[0_0_8px_rgba(16,185,129,0.5)] z-50 hover:scale-125 transition-transform" 
+                        title="Output: Validated Payload" 
+                    />
                 </div>
             </div>
 
-            {/* Main Visual Stage (Refactored for Safe Zone Containment) */}
-            <div className="flex-1 relative bg-slate-900 flex items-center justify-center p-4 min-h-[300px] overflow-hidden rounded border border-emerald-900/30 shadow-inner">
+            {/* Main Visual Stage (Safe-Zone Rendering) */}
+            <div className="flex-1 relative bg-slate-950 flex items-center justify-center p-4 min-h-[300px] overflow-hidden rounded border border-emerald-900/30 shadow-inner group/stage">
                  
                  {/* Empty State */}
                  {!incomingPayload && (
@@ -192,6 +190,17 @@ const PreviewInstanceRow = memo(({ index, nodeId }: { index: number, nodeId: str
                      </div>
                  )}
 
+                 {/* Safe Zone Matte Container */}
+                 {incomingPayload && (
+                    <div className="absolute inset-4 pointer-events-none z-0">
+                        <div className="w-full h-full border-2 border-dashed border-emerald-500/20 bg-slate-900/50 flex flex-col justify-end">
+                             <div className="p-1.5 bg-black/60 backdrop-blur-sm self-start rounded-tr text-[9px] font-mono text-emerald-500/70 border-t border-r border-emerald-500/10">
+                                {Math.round(targetW)}x{Math.round(targetH)}px
+                             </div>
+                        </div>
+                    </div>
+                 )}
+
                  {/* Content Render - Max Containment Strategy */}
                  {previewUrl && !isLoading && !error && (
                      <img 
@@ -199,16 +208,6 @@ const PreviewInstanceRow = memo(({ index, nodeId }: { index: number, nodeId: str
                        alt="Preview" 
                        className="max-w-full max-h-full object-contain pointer-events-none drop-shadow-2xl relative z-10"
                      />
-                 )}
-
-                 {/* PROCEDURAL OVERLAYS */}
-                 {incomingPayload && (
-                    <div className="absolute inset-4 border-2 border-dashed border-emerald-500/20 rounded-sm pointer-events-none z-0">
-                         {/* Pixel Dimension Readout */}
-                        <span className="absolute bottom-2 left-2 bg-black/60 px-1.5 py-0.5 rounded text-[9px] font-mono text-emerald-400/70 border border-emerald-500/20 backdrop-blur-sm">
-                            {Math.round(targetW)}x{Math.round(targetH)}px
-                        </span>
-                    </div>
                  )}
 
                  {/* Scanning Effect */}
@@ -222,11 +221,11 @@ const PreviewInstanceRow = memo(({ index, nodeId }: { index: number, nodeId: str
 
             {/* Metrics Footer */}
             {incomingPayload && (
-                 <div className="flex items-center justify-between px-2 text-[9px] font-mono font-bold tracking-wider text-slate-500">
+                 <div className="flex items-center justify-between px-2 text-[9px] font-mono font-bold tracking-wider text-slate-500 pt-1">
                      <div className="flex items-center gap-3">
                          <div className="flex items-center gap-1.5">
                              <Layers className="w-3 h-3 opacity-70" />
-                             <span>{layerCount} NODES</span>
+                             <span>{layerCount} LAYERS</span>
                          </div>
                          <div className="flex items-center gap-1.5">
                              <Maximize className="w-3 h-3 opacity-70" />
@@ -263,8 +262,21 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
   const { setNodes } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
   const { unregisterNode } = useProceduralStore();
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // ResizeObserver: Essential for tracking internal content changes (like image loads)
+  useEffect(() => {
+    if (rootRef.current) {
+        const observer = new ResizeObserver(() => {
+            updateNodeInternals(id);
+        });
+        observer.observe(rootRef.current);
+        return () => observer.disconnect();
+    }
+  }, [id, updateNodeInternals]);
 
   useEffect(() => {
+    // Force React Flow to re-index handles when instances change or on mount
     updateNodeInternals(id);
   }, [id, instanceCount, updateNodeInternals]);
 
@@ -277,31 +289,36 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
   }, [id, instanceCount, setNodes]);
 
   return (
-    <div className="w-full h-full bg-slate-900 rounded-lg shadow-2xl border border-emerald-500/50 font-sans flex flex-col relative transition-all group duration-500 hover:border-emerald-400">
+    // ROOT: No overflow-hidden to allow handles to poke out from rows
+    <div ref={rootRef} className="w-[650px] bg-slate-900 rounded-lg shadow-2xl border border-emerald-500/50 font-sans flex flex-col relative transition-all group duration-500 hover:border-emerald-400">
       <NodeResizer 
-        minWidth={350} 
-        minHeight={350} 
-        isVisible={true}
-        onResize={() => updateNodeInternals(id)}
+        minWidth={650} 
+        minHeight={400} 
+        isVisible={true} 
+        onResize={() => updateNodeInternals(id)} // Critical: Syncs handles during manual resize
         lineStyle={{ border: 'none' }}
         handleStyle={{ background: 'transparent', border: 'none' }}
       />
 
-      {/* Header - Overflow visible to allow top/corner effects if needed */}
-      <div className="relative p-2 border-b flex items-center justify-between shrink-0 overflow-visible rounded-t-lg backdrop-blur-md bg-emerald-950/90 border-emerald-500/30">
+      {/* Header */}
+      <div className="relative p-2 border-b flex items-center justify-between shrink-0 rounded-t-lg bg-emerald-950/80 backdrop-blur-md border-emerald-500/30 overflow-hidden">
          {/* Noise Background Container */}
-         <div className="absolute inset-0 rounded-t-lg overflow-hidden pointer-events-none">
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-soft-light"></div>
+         <div className="absolute inset-0 pointer-events-none opacity-20 mix-blend-soft-light">
+            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
          </div>
          
-         <div className="flex items-center space-x-2 z-10">
-           <Eye className="w-4 h-4 text-emerald-400" />
+         <div className="flex items-center space-x-2 z-10 pl-1">
+           <MonitorPlay className="w-4 h-4 text-emerald-400" />
            <div className="flex flex-col leading-none">
              <span className="text-sm font-bold tracking-tight text-emerald-100">Visual Preview</span>
              <span className="text-[9px] font-mono font-bold tracking-widest uppercase text-emerald-500/70">
-                 MULTI-CHANNEL MONITOR
+                 MULTI-MONITOR
              </span>
            </div>
+         </div>
+         
+         <div className="z-10 px-2 py-0.5 rounded border border-emerald-500/20 bg-black/20 text-[9px] font-mono text-emerald-400">
+             {instanceCount} Active {instanceCount === 1 ? 'View' : 'Views'}
          </div>
       </div>
 
