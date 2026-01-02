@@ -299,7 +299,7 @@ const ReviewerInstanceRow: React.FC<{
                     </button>
                     <div className="relative">
                         <span className="text-[7px] text-emerald-600 font-bold font-mono mr-5 tracking-wider">POLISHED_OUT</span>
-                        <Handle type="source" position={Position.Right} id={`polished-out-${index}`} className="!absolute !-right-2 !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !bg-white !border-2 !border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] z-50" title="Output: Aesthetic Sign-off" />
+                        <Handle type="source" position={Position.Right} id={`polished-out-${index}`} className="!absolute !-right-1.5 !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !bg-white !border-2 !border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] z-50" title="Output: Aesthetic Sign-off" />
                     </div>
                 </div>
             </div>
@@ -485,8 +485,16 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
 
   return (
     // ROOT: Removed overflow-hidden to allow handles to peek out. Added relative.
-    <div className="w-[400px] bg-slate-900 rounded-lg shadow-2xl border border-emerald-500/50 font-sans flex flex-col relative transition-all hover:shadow-emerald-900/20 hover:border-emerald-400 group">
-      <NodeResizer minWidth={400} minHeight={300} isVisible={false} />
+    // Changed fixed width to w-full h-full to support resizing.
+    <div className="w-full h-full bg-slate-900 rounded-lg shadow-2xl border border-emerald-500/50 font-sans flex flex-col relative transition-all hover:shadow-emerald-900/20 hover:border-emerald-400 group">
+      <NodeResizer 
+        minWidth={400} 
+        minHeight={300} 
+        isVisible={true}
+        onResize={() => updateNodeInternals(id)}
+        handleStyle={{ background: 'transparent', border: 'none' }}
+        lineStyle={{ border: 'none' }}
+      />
       
       {/* Header: Added rounded-t-lg and overflow-hidden for corner clipping */}
       <div className="relative bg-emerald-950/80 backdrop-blur-md p-2 border-b border-emerald-500/30 flex items-center justify-between shrink-0 overflow-hidden rounded-t-lg">
