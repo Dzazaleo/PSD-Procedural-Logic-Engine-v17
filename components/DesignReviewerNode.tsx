@@ -1,11 +1,11 @@
-import React, { memo, useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Handle, Position, NodeProps, NodeResizer, useEdges, useReactFlow, useUpdateNodeInternals, useNodes } from 'reactflow';
+import React, { memo, useState, useEffect, useCallback, useRef } from 'react';
+import { Handle, Position, NodeProps, NodeResizer, useEdges, useUpdateNodeInternals, useReactFlow } from 'reactflow';
 import { PSDNodeData, TransformedPayload, ReviewerInstanceState, ReviewerStrategy, TransformedLayer, LayerOverride, ChatMessage } from '../types';
 import { useProceduralStore } from '../store/ProceduralContext';
 import { findLayerByPath } from '../services/psdService';
 import { GoogleGenAI, Type } from "@google/genai";
 import { Psd } from 'ag-psd';
-import { BrainCircuit, Activity, ShieldCheck, Move, Maximize, RotateCw, CheckCircle2, ArrowRight, ScanEye } from 'lucide-react';
+import { Activity, ShieldCheck, Maximize, RotateCw, ArrowRight, ScanEye } from 'lucide-react';
 
 const DEFAULT_REVIEWER_STATE: ReviewerInstanceState = {
     chatHistory: [],
@@ -134,26 +134,26 @@ const NudgeMatrix: React.FC<{ strategy: ReviewerStrategy | null }> = ({ strategy
     
     const overrides = strategy.overrides || [];
     return (
-        <div className="bg-slate-950/80 border border-emerald-500/20 rounded p-2 mt-2 space-y-1">
-            <div className="flex justify-between items-center border-b border-emerald-900/50 pb-1 mb-1">
+        <div className="bg-black/40 border border-emerald-500/10 rounded p-2 mt-2 space-y-1.5">
+            <div className="flex justify-between items-center border-b border-emerald-900/50 pb-1.5 mb-1">
                 <span className="text-[8px] font-bold text-emerald-400 uppercase tracking-widest">Aesthetic Deltas</span>
                 <span className="text-[8px] text-emerald-600 font-mono">{overrides.length} Layers Polished</span>
             </div>
-            <div className="grid grid-cols-4 gap-1 text-center">
-                <div className="flex flex-col bg-emerald-950/20 p-1 rounded">
-                    <span className="text-[7px] text-emerald-600 uppercase">Pos</span>
+            <div className="grid grid-cols-4 gap-1.5 text-center">
+                <div className="flex flex-col bg-emerald-950/30 p-1.5 rounded border border-emerald-900/30">
+                    <span className="text-[7px] text-emerald-600 uppercase font-bold">Pos</span>
                     <ShieldCheck className="w-2.5 h-2.5 mx-auto my-0.5 text-emerald-400" />
                 </div>
-                <div className="flex flex-col bg-emerald-950/20 p-1 rounded">
-                    <span className="text-[7px] text-emerald-600 uppercase">Scale</span>
+                <div className="flex flex-col bg-emerald-950/30 p-1.5 rounded border border-emerald-900/30">
+                    <span className="text-[7px] text-emerald-600 uppercase font-bold">Scale</span>
                     <Maximize className="w-2.5 h-2.5 mx-auto my-0.5 text-emerald-400" />
                 </div>
-                <div className="flex flex-col bg-emerald-950/20 p-1 rounded">
-                    <span className="text-[7px] text-emerald-600 uppercase">Rot</span>
+                <div className="flex flex-col bg-emerald-950/30 p-1.5 rounded border border-emerald-900/30">
+                    <span className="text-[7px] text-emerald-600 uppercase font-bold">Rot</span>
                     <RotateCw className="w-2.5 h-2.5 mx-auto my-0.5 text-emerald-400" />
                 </div>
-                <div className="flex flex-col bg-emerald-950/20 p-1 rounded">
-                    <span className="text-[7px] text-emerald-600 uppercase">Sync</span>
+                <div className="flex flex-col bg-emerald-950/30 p-1.5 rounded border border-emerald-900/30">
+                    <span className="text-[7px] text-emerald-600 uppercase font-bold">Sync</span>
                     <Activity className="w-2.5 h-2.5 mx-auto my-0.5 text-emerald-500 animate-pulse" />
                 </div>
             </div>
@@ -208,25 +208,25 @@ const ReviewerInstanceRow: React.FC<{
 
 
     return (
-        <div className="relative border-b border-emerald-900/30 bg-slate-900/20 p-3 space-y-3">
+        <div className="relative border-b border-emerald-900/30 bg-slate-900/40 p-3 space-y-3">
             {/* Headers & Wiring */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981]"></div>
-                    <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider">
+                    <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">
                         {incomingPayload?.targetContainer || `Auditor ${index + 1}`}
                     </span>
                 </div>
                 <div className="flex items-center space-x-2">
-                    <Handle type="target" position={Position.Left} id={`payload-in-${index}`} className="!static !w-2.5 !h-2.5 !bg-indigo-500 !border-slate-900" title="Input: Transformed Payload" />
-                    <Handle type="target" position={Position.Left} id={`target-in-${index}`} className="!static !w-2.5 !h-2.5 !bg-emerald-500 !border-slate-900" title="Input: Target Definition" />
+                    <Handle type="target" position={Position.Left} id={`payload-in-${index}`} className="!static !w-2.5 !h-2.5 !rounded-full !bg-indigo-500 !border-2 !border-slate-900" title="Input: Transformed Payload" />
+                    <Handle type="target" position={Position.Left} id={`target-in-${index}`} className="!static !w-2.5 !h-2.5 !rounded-full !bg-emerald-500 !border-2 !border-slate-900" title="Input: Target Definition" />
                 </div>
             </div>
 
             {/* Audit Console */}
             <div 
                 ref={chatContainerRef}
-                className="h-32 bg-black/40 border border-emerald-900/50 rounded p-2 overflow-y-auto custom-scrollbar font-mono text-[9px] leading-tight space-y-2 cursor-auto"
+                className="h-32 bg-black/60 border border-emerald-900/50 rounded-md p-2 overflow-y-auto custom-scrollbar font-mono text-[9px] leading-tight space-y-2 cursor-auto shadow-inner"
                 onMouseDown={e => e.stopPropagation()}
             >
                 {state.chatHistory.length === 0 ? (
@@ -236,12 +236,12 @@ const ReviewerInstanceRow: React.FC<{
                 ) : (
                     state.chatHistory.map((msg, i) => (
                         <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                            <div className={`${msg.role === 'model' ? 'text-emerald-400' : 'text-slate-500'} bg-slate-900/80 p-1.5 rounded border border-emerald-900/30`}>
-                                <span className="font-bold opacity-50 mr-1">[{msg.role.toUpperCase()}]</span>
+                            <div className={`${msg.role === 'model' ? 'text-emerald-400 border-emerald-900/50 bg-emerald-950/20' : 'text-slate-500 border-slate-700 bg-slate-900/50'} p-2 rounded border max-w-full break-words`}>
+                                <span className="font-bold opacity-50 mr-2">[{msg.role.toUpperCase()}]</span>
                                 {msg.parts[0].text}
                             </div>
                             {msg.strategySnapshot && (
-                                <div className="mt-1 pl-2 text-emerald-600 italic">
+                                <div className="mt-1 pl-2 text-emerald-600/80 italic text-[8px]">
                                     &gt; Applied {msg.strategySnapshot.overrides.length} surgical nudges.
                                 </div>
                             )}
@@ -249,7 +249,7 @@ const ReviewerInstanceRow: React.FC<{
                     ))
                 )}
                 {isProcessing && (
-                     <div className="flex items-center space-x-2 text-emerald-500 animate-pulse mt-2">
+                     <div className="flex items-center space-x-2 text-emerald-500 animate-pulse mt-2 px-1">
                         <ScanEye className="w-3 h-3" />
                         <span>CARO is reconciling optics...</span>
                      </div>
@@ -265,14 +265,18 @@ const ReviewerInstanceRow: React.FC<{
                     <button 
                         onClick={() => onReview(index)}
                         disabled={!isReady || isProcessing}
-                        className={`px-3 py-1.5 rounded text-[9px] font-bold uppercase transition-all flex items-center gap-1 ${isReady && !isProcessing ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-800 text-slate-600 cursor-not-allowed'}`}
+                        className={`px-4 py-1.5 rounded text-[9px] font-bold uppercase tracking-widest transition-all shadow-lg flex items-center gap-1.5
+                            ${isReady && !isProcessing 
+                                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transform hover:-translate-y-0.5 border border-emerald-500/50' 
+                                : 'bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700'
+                            }`}
                     >
                         {isProcessing ? <Activity className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
                         <span>Reconcile</span>
                     </button>
                     <div className="relative">
-                        <span className="text-[7px] text-emerald-700 font-mono mr-5">POLISHED_OUT</span>
-                        <Handle type="source" position={Position.Right} id={`polished-out-${index}`} className="!absolute !right-[-8px] !top-1/2 !-translate-y-1/2 !w-3 !h-3 !bg-white !border-emerald-500" title="Output: Aesthetic Sign-off" />
+                        <span className="text-[7px] text-emerald-600 font-bold font-mono mr-5 tracking-wider">POLISHED_OUT</span>
+                        <Handle type="source" position={Position.Right} id={`polished-out-${index}`} className="!absolute !right-[-8px] !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !bg-white !border-2 !border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" title="Output: Aesthetic Sign-off" />
                     </div>
                 </div>
             </div>
@@ -457,25 +461,25 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
   };
 
   return (
-    <div className="w-[400px] bg-slate-900 rounded-lg shadow-2xl border border-emerald-500/50 font-sans flex flex-col overflow-hidden transition-colors hover:border-emerald-400">
+    <div className="w-[400px] bg-slate-900 rounded-lg shadow-2xl border border-emerald-500/50 font-sans flex flex-col overflow-hidden transition-all hover:shadow-emerald-900/20 hover:border-emerald-400 group">
       <NodeResizer minWidth={400} minHeight={300} isVisible={true} lineStyle={{ border: 'none' }} handleStyle={{ background: 'transparent' }} />
       
-      {/* Header */}
-      <div className="bg-emerald-950/80 p-2 border-b border-emerald-500/30 flex items-center justify-between relative overflow-hidden">
-         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10"></div>
+      {/* Header - High Fidelity with Noise Overlay */}
+      <div className="relative bg-emerald-950/80 backdrop-blur-md p-2 border-b border-emerald-500/30 flex items-center justify-between shrink-0 overflow-hidden">
+         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-soft-light pointer-events-none"></div>
          <div className="flex items-center space-x-2 z-10">
            <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
            <div className="flex flex-col leading-none">
              <span className="text-sm font-bold text-emerald-100 tracking-tight">Design Reviewer</span>
-             <span className="text-[9px] text-emerald-500/70 font-mono">PERSONA: CARO</span>
+             <span className="text-[9px] text-emerald-500/70 font-mono font-bold tracking-widest">PERSONA: CARO</span>
            </div>
          </div>
-         <div className="z-10 px-1.5 py-0.5 rounded border border-emerald-500/50 bg-emerald-500/10 text-[8px] text-emerald-400 font-bold uppercase tracking-widest">
+         <div className="z-10 px-1.5 py-0.5 rounded border border-emerald-500/50 bg-emerald-500/10 text-[8px] text-emerald-400 font-bold uppercase tracking-widest backdrop-blur-sm">
             Audit Gate
          </div>
       </div>
 
-      <div className="flex flex-col bg-slate-950">
+      <div className="flex flex-col bg-slate-950/50 min-h-[100px]">
           {Array.from({ length: instanceCount }).map((_, i) => (
               <ReviewerInstanceRow 
                 key={i} 
@@ -489,7 +493,7 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
           ))}
       </div>
 
-      <button onClick={addInstance} className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-emerald-600 hover:text-emerald-400 text-[9px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center space-x-2 border-t border-emerald-900/50">
+      <button onClick={addInstance} className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-emerald-500 hover:text-emerald-400 text-[9px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center space-x-2 border-t border-emerald-900/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
           <ArrowRight className="w-3 h-3" />
           <span>Add Audit Instance</span>
       </button>

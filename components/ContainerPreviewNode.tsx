@@ -3,7 +3,7 @@ import { Handle, Position, NodeProps, useEdges, NodeResizer } from 'reactflow';
 import { PSDNodeData, TransformedPayload } from '../types';
 import { useProceduralStore } from '../store/ProceduralContext';
 import { compositePayloadToCanvas } from '../services/psdService';
-import { Eye, Layers, Maximize, Scan, AlertTriangle, CheckCircle2, FileWarning, ShieldCheck, RotateCw } from 'lucide-react';
+import { Eye, Layers, Maximize, Scan, AlertTriangle, RotateCw, ShieldCheck, FileWarning } from 'lucide-react';
 
 export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -29,8 +29,6 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
   }, [id, unregisterNode]);
 
   // 1. Resolve Incoming Payload
-  // Look for a connected source on 'payload-in'
-  // Priority: Reviewer Registry (Polished) -> Payload Registry (Raw)
   const incomingPayload = useMemo(() => {
     const edge = edges.find(e => e.target === id && e.targetHandle === 'payload-in');
     if (!edge) return null;
@@ -48,7 +46,7 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
     return null;
   }, [edges, id, payloadRegistry, reviewerRegistry]);
 
-  // 2. Render Effect (Triggered by Payload OR Global Version/Rehydration)
+  // 2. Render Effect
   useEffect(() => {
     if (!incomingPayload) {
         setPreviewUrl(null);
@@ -62,19 +60,14 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
     if (!psd) {
         setError('BINARY_MISSING');
         setIsLoading(false);
-        // CRITICAL: Relay payload even if visual is missing to maintain data flow to Export
-        // We pass an empty string for the URL to indicate "no visual available" but data is valid.
         registerPreviewPayload(id, 'payload-out', incomingPayload, '');
         return;
     }
 
-    // Reset error if we recovered
     if (error === 'BINARY_MISSING') {
         setError(null);
     }
 
-    // Optimization: Check deep equality using JSON string + Global Version
-    // We include globalVersion in the signature to force re-renders if the store signals a refresh
     const payloadSignature = JSON.stringify({
         metrics: incomingPayload.metrics,
         layers: incomingPayload.layers,
@@ -87,7 +80,6 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
     }
     lastPayloadRef.current = payloadSignature;
 
-    // Start Render
     setIsLoading(true);
 
     let isMounted = true;
@@ -98,9 +90,6 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
                 setPreviewUrl(url);
                 setIsLoading(false);
                 setError(null);
-                
-                // 3. Broadcast to Store (Proxy Logic)
-                // This validates the node as a 'Polished' source for Export with a valid visual
                 registerPreviewPayload(id, 'payload-out', incomingPayload, url);
             }
         })
@@ -109,7 +98,6 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
             if (isMounted) {
                 setError('RENDER_FAILED');
                 setIsLoading(false);
-                // Pipeline Safety: Still relay the data even if rendering fails
                 registerPreviewPayload(id, 'payload-out', incomingPayload, '');
             }
         });
@@ -134,137 +122,150 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
   const isPolished = incomingPayload?.isPolished;
 
   return (
-    <div className={`min-w-[300px] min-h-[300px] bg-slate-900 rounded-lg shadow-2xl border font-sans flex flex-col overflow-hidden transition-all group ${error === 'BINARY_MISSING' ? 'border-orange-500/50 hover:border-orange-400' : 'border-emerald-500/50 hover:border-emerald-400'}`}>
+    <div className={`min-w-[300px] min-h-[300px] bg-slate-900 rounded-lg shadow-2xl border font-sans flex flex-col overflow-hidden transition-all group duration-500
+        ${error === 'BINARY_MISSING' 
+            ? 'border-orange-500/50 shadow-orange-900/20' 
+            : 'border-emerald-500/50 shadow-emerald-900/20 hover:border-emerald-400'
+        }`}
+    >
       <NodeResizer minWidth={300} minHeight={300} isVisible={true} lineStyle={{ border: 'none' }} handleStyle={{ background: 'transparent' }} />
 
-      {/* Header */}
-      <div className={`p-2 border-b flex items-center justify-between shrink-0 relative overflow-hidden ${error === 'BINARY_MISSING' ? 'bg-orange-950/80 border-orange-500/30' : 'bg-emerald-950/80 border-emerald-500/30'}`}>
-         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10"></div>
+      {/* Header - High Fidelity with Noise */}
+      <div className={`relative p-2 border-b flex items-center justify-between shrink-0 overflow-hidden backdrop-blur-md
+          ${error === 'BINARY_MISSING' 
+              ? 'bg-orange-950/90 border-orange-500/30' 
+              : 'bg-emerald-950/90 border-emerald-500/30'
+          }`}
+      >
+         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-soft-light pointer-events-none"></div>
+         
          <div className="flex items-center space-x-2 z-10">
            <Eye className={`w-4 h-4 ${error === 'BINARY_MISSING' ? 'text-orange-400' : 'text-emerald-400'}`} />
            <div className="flex flex-col leading-none">
              <span className={`text-sm font-bold tracking-tight ${error === 'BINARY_MISSING' ? 'text-orange-100' : 'text-emerald-100'}`}>Visual Preview</span>
-             <span className={`text-[9px] font-mono ${error === 'BINARY_MISSING' ? 'text-orange-500/70' : 'text-emerald-500/70'}`}>RENDER ENGINE</span>
+             <span className={`text-[9px] font-mono font-bold tracking-widest ${error === 'BINARY_MISSING' ? 'text-orange-500/70' : 'text-emerald-500/70'}`}>RENDER ENGINE</span>
            </div>
          </div>
          <div className="z-10 flex space-x-2">
              {isPolished && (
-                 <span className="flex items-center gap-1 text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-bold uppercase tracking-wider">
+                 <span className="flex items-center gap-1 text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-bold uppercase tracking-widest backdrop-blur-sm">
                      <ShieldCheck className="w-2.5 h-2.5" /> Polished
                  </span>
              )}
          </div>
       </div>
 
-      {/* Input Handles Area */}
-      <div className="relative h-8 bg-slate-900 border-b border-slate-800 flex items-center px-2 justify-between">
+      {/* Input Handles Area - Darker, cleaner */}
+      <div className="relative h-8 bg-slate-950 border-b border-slate-800 flex items-center px-2 justify-between">
           <div className="flex items-center gap-4">
               <div className="relative flex items-center">
-                  <Handle type="target" position={Position.Left} id="payload-in" className="!static !w-2.5 !h-2.5 !bg-indigo-500 !border-slate-800" title="Input: Transformed Payload" />
-                  <span className="text-[9px] text-slate-500 font-mono ml-1.5 font-bold">PAYLOAD</span>
+                  <Handle type="target" position={Position.Left} id="payload-in" className="!static !w-2.5 !h-2.5 !rounded-full !bg-indigo-500 !border-2 !border-slate-800" title="Input: Transformed Payload" />
+                  <span className="text-[9px] text-slate-500 font-mono ml-1.5 font-bold tracking-wider">PAYLOAD</span>
               </div>
               <div className="relative flex items-center">
-                  <Handle type="target" position={Position.Left} id="target-in" className="!static !w-2.5 !h-2.5 !bg-emerald-500 !border-slate-800" title="Input: Target Definition" />
-                  <span className="text-[9px] text-slate-500 font-mono ml-1.5 font-bold">TARGET</span>
+                  <Handle type="target" position={Position.Left} id="target-in" className="!static !w-2.5 !h-2.5 !rounded-full !bg-emerald-500 !border-2 !border-slate-800" title="Input: Target Definition" />
+                  <span className="text-[9px] text-slate-500 font-mono ml-1.5 font-bold tracking-wider">TARGET</span>
               </div>
           </div>
           {incomingPayload && (
-              <span className="text-[9px] text-slate-400 font-mono">
+              <span className="text-[9px] text-slate-400 font-mono font-medium">
                   {incomingPayload.targetContainer}
               </span>
           )}
       </div>
 
-      {/* Main Preview Stage */}
-      <div className="flex-1 bg-[#1e293b] relative overflow-hidden flex items-center justify-center p-2">
-          {/* Checkerboard Background */}
-          <div className="absolute inset-0 opacity-20 pointer-events-none" 
-               style={{ backgroundImage: `url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/nYDCgBDAm9BGDWAAjyQc6WCgAgCT0kt0eZxtwgAAAABJRU5ErkJggg==')` }}>
-          </div>
-
-          {/* Empty State */}
-          {!incomingPayload && (
-              <div className="flex flex-col items-center text-slate-600 z-10">
-                  <Scan className="w-8 h-8 mb-2 opacity-50" />
-                  <span className="text-xs font-medium">Waiting for signal...</span>
+      {/* Main Preview Stage - Monitor Frame */}
+      <div className="flex-1 bg-[#0f172a] relative overflow-hidden flex items-center justify-center p-3">
+          {/* Inner Bezel/Frame */}
+          <div className={`relative w-full h-full rounded border-2 overflow-hidden flex items-center justify-center transition-colors duration-500
+             ${error === 'BINARY_MISSING' ? 'border-orange-900/50 bg-orange-950/10' : 'border-emerald-900/50 bg-slate-900/50 shadow-inner'}
+          `}>
+              {/* Checkerboard Background */}
+              <div className="absolute inset-0 opacity-10 pointer-events-none" 
+                   style={{ backgroundImage: `url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/nYDCgBDAm9BGDWAAjyQc6WCgAgCT0kt0eZxtwgAAAABJRU5ErkJggg==')` }}>
               </div>
-          )}
 
-          {/* Binary Missing Error - REHYDRATION STATE */}
-          {error === 'BINARY_MISSING' && (
-              <div className="absolute inset-0 bg-orange-950/40 backdrop-blur-sm flex flex-col items-center justify-center z-20 p-4 text-center border-2 border-orange-500/30 m-2 rounded">
-                  <FileWarning className="w-8 h-8 text-orange-500 mb-2 animate-bounce" />
-                  <span className="text-xs font-bold text-orange-200 uppercase tracking-wider mb-1">Binary Source Missing</span>
-                  <span className="text-[10px] text-orange-200/80 leading-tight mb-3 px-2">
-                      Please re-upload the source PSD in the Load Node to enable preview.
-                  </span>
-                  
-                  <button 
-                    onClick={() => triggerGlobalRefresh()}
-                    className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors shadow-lg"
-                  >
-                      <RotateCw className="w-3 h-3" />
-                      Refresh
-                  </button>
-              </div>
-          )}
-          
-          {/* Generic Render Error */}
-          {error === 'RENDER_FAILED' && (
-              <div className="absolute inset-0 bg-red-950/40 backdrop-blur-sm flex flex-col items-center justify-center z-20 p-4 text-center border-2 border-red-500/30 m-2 rounded">
-                  <AlertTriangle className="w-8 h-8 text-red-500 mb-2" />
-                  <span className="text-xs font-bold text-red-200 uppercase tracking-wider mb-1">Render Failed</span>
-                  <span className="text-[10px] text-red-200/80 leading-tight">
-                      The compositor encountered an error. Data has been passed through.
-                  </span>
-              </div>
-          )}
+              {/* Empty State */}
+              {!incomingPayload && (
+                  <div className="flex flex-col items-center text-slate-600 z-10">
+                      <Scan className="w-8 h-8 mb-2 opacity-30" />
+                      <span className="text-[10px] font-mono uppercase tracking-widest opacity-60">Awaiting Signal</span>
+                  </div>
+              )}
 
-          {/* Content Render */}
-          {previewUrl && !isLoading && !error && (
-              <img 
-                src={previewUrl} 
-                alt="Container Preview" 
-                className="w-full h-full object-contain relative z-10"
-              />
-          )}
+              {/* Binary Missing Error - REHYDRATION STATE */}
+              {error === 'BINARY_MISSING' && (
+                  <div className="absolute inset-0 bg-orange-950/60 backdrop-blur-sm flex flex-col items-center justify-center z-20 p-4 text-center">
+                      <FileWarning className="w-8 h-8 text-orange-500 mb-2 animate-bounce" />
+                      <span className="text-xs font-bold text-orange-200 uppercase tracking-wider mb-1">Binary Source Missing</span>
+                      <span className="text-[10px] text-orange-200/80 leading-tight mb-3 px-2 max-w-[200px]">
+                          Re-upload source PSD to enable visual compositing.
+                      </span>
+                      
+                      <button 
+                        onClick={() => triggerGlobalRefresh()}
+                        className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors shadow-lg border border-orange-400/50"
+                      >
+                          <RotateCw className="w-3 h-3" />
+                          Refresh
+                      </button>
+                  </div>
+              )}
+              
+              {/* Generic Render Error */}
+              {error === 'RENDER_FAILED' && (
+                  <div className="absolute inset-0 bg-red-950/60 backdrop-blur-sm flex flex-col items-center justify-center z-20 p-4 text-center">
+                      <AlertTriangle className="w-8 h-8 text-red-500 mb-2" />
+                      <span className="text-xs font-bold text-red-200 uppercase tracking-wider mb-1">Render Failed</span>
+                      <span className="text-[10px] text-red-200/80 leading-tight">
+                          Compositor error. Data passed through.
+                      </span>
+                  </div>
+              )}
 
-          {/* Loading Overlay */}
-          {isLoading && (
-              <div className="absolute inset-0 bg-slate-900/50 z-30 flex items-center justify-center">
-                  <div className="relative w-full h-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/10 to-transparent animate-scan-y"></div>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="bg-slate-900/90 px-3 py-1.5 rounded border border-emerald-500/30 flex items-center gap-2 shadow-xl">
-                              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
-                              <span className="text-[10px] text-emerald-300 font-mono uppercase tracking-wider">Rendering...</span>
-                          </div>
+              {/* Content Render */}
+              {previewUrl && !isLoading && !error && (
+                  <img 
+                    src={previewUrl} 
+                    alt="Container Preview" 
+                    className="w-full h-full object-contain relative z-10 drop-shadow-2xl"
+                  />
+              )}
+
+              {/* Scanning Overlay - Enhanced */}
+              {isLoading && (
+                  <div className="absolute inset-0 z-30 pointer-events-none">
+                      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/20 to-transparent animate-scan-y"></div>
+                      <div className="absolute inset-x-0 h-px bg-emerald-400/50 shadow-[0_0_15px_rgba(52,211,153,0.8)] animate-scan-line"></div>
+                      <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-slate-900/90 px-2 py-1 rounded border border-emerald-500/30 shadow-xl backdrop-blur-md">
+                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
+                          <span className="text-[9px] text-emerald-300 font-mono font-bold tracking-wider">RENDERING</span>
                       </div>
                   </div>
-              </div>
-          )}
+              )}
+          </div>
       </div>
 
-      {/* Footer / Metrics */}
-      <div className="h-8 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-3 shrink-0">
+      {/* Footer */}
+      <div className="h-8 bg-slate-950 border-t border-slate-800 flex items-center justify-between px-3 shrink-0 text-[9px] font-mono font-bold tracking-wider text-slate-500">
           <div className="flex items-center gap-3">
               {incomingPayload && (
                   <>
-                    <div className="flex items-center gap-1.5 text-[9px] text-slate-400">
-                        <Layers className="w-3 h-3" />
-                        <span>{layerCount} Nodes</span>
+                    <div className="flex items-center gap-1.5">
+                        <Layers className="w-3 h-3 opacity-70" />
+                        <span>{layerCount} NODES</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[9px] text-slate-400">
-                        <Maximize className="w-3 h-3" />
-                        <span className="font-mono">{incomingPayload.scaleFactor.toFixed(2)}x</span>
+                    <div className="flex items-center gap-1.5">
+                        <Maximize className="w-3 h-3 opacity-70" />
+                        <span>{incomingPayload.scaleFactor.toFixed(2)}x SCALE</span>
                     </div>
                   </>
               )}
           </div>
           
           <div className="relative flex items-center">
-              <span className="text-[9px] font-bold text-emerald-600 mr-4 tracking-widest uppercase">Proxy Out</span>
-              <Handle type="source" position={Position.Right} id="payload-out" className="!static !w-2.5 !h-2.5 !bg-emerald-500 !border-slate-800" title="Output: Validated Payload" />
+              <span className="text-[8px] font-bold text-emerald-700 mr-4 tracking-widest uppercase">Proxy Out</span>
+              <Handle type="source" position={Position.Right} id="payload-out" className="!static !w-2.5 !h-2.5 !rounded-full !bg-emerald-500 !border-2 !border-slate-800 shadow-[0_0_8px_rgba(16,185,129,0.5)]" title="Output: Validated Payload" />
           </div>
       </div>
 
@@ -275,6 +276,15 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
         }
         .animate-scan-y {
             animation: scan-y 2s linear infinite;
+        }
+        @keyframes scan-line {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+        .animate-scan-line {
+            animation: scan-line 2s linear infinite;
         }
       `}</style>
     </div>
