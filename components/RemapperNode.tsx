@@ -155,26 +155,11 @@ const calculateOverrideMetrics = (
     sourceLayers: SerializableLayer[],
     sourceRect: { x: number, y: number, w: number, h: number },
     targetRect: { x: number, y: number, w: number, h: number },
-    strategy: LayoutStrategy
+    strategy: LayoutStrategy,
+    baseline: BaselineMetrics
 ): OverrideMetric[] => {
     const metrics: OverrideMetric[] = [];
     if (!strategy.overrides || strategy.overrides.length === 0) return metrics;
-
-    const ratioX = targetRect.w / sourceRect.w;
-    const ratioY = targetRect.h / sourceRect.h;
-    let globalScale = Math.min(ratioX, ratioY);
-    let anchorX = targetRect.x;
-    let anchorY = targetRect.y;
-
-    if (strategy) {
-        globalScale = strategy.suggestedScale;
-        const scaledW = sourceRect.w * globalScale;
-        const scaledH = sourceRect.h * globalScale;
-        anchorX = targetRect.x + (targetRect.w - scaledW) / 2;
-        if (strategy.anchor === 'TOP') anchorY = targetRect.y;
-        else if (strategy.anchor === 'BOTTOM') anchorY = targetRect.y + (targetRect.h - scaledH);
-        else anchorY = targetRect.y + (targetRect.h - scaledH) / 2;
-    }
 
     const traverse = (layers: SerializableLayer[]) => {
         layers.forEach(layer => {
@@ -182,10 +167,14 @@ const calculateOverrideMetrics = (
             if (override) {
                 const relX = (layer.coords.x - sourceRect.x) / sourceRect.w;
                 const relY = (layer.coords.y - sourceRect.y) / sourceRect.h;
-                const geomX = anchorX + (relX * (sourceRect.w * globalScale));
-                const geomY = anchorY + (relY * (sourceRect.h * globalScale));
-                const finalX = targetRect.x + override.xOffset;
-                const finalY = targetRect.y + override.yOffset;
+                
+                // PHASE 4: Geometric Baseline (V0)
+                const geomX = baseline.x + (relX * (sourceRect.w * baseline.scale));
+                const geomY = baseline.y + (relY * (sourceRect.h * baseline.scale));
+                
+                // Final Position with Semantic Delta
+                const finalX = geomX + override.xOffset;
+                const finalY = geomY + override.yOffset;
 
                 metrics.push({
                     layerId: layer.id,
@@ -194,8 +183,8 @@ const calculateOverrideMetrics = (
                     geomY,
                     finalX,
                     finalY,
-                    deltaX: finalX - geomX,
-                    deltaY: finalY - geomY,
+                    deltaX: override.xOffset, // Explicitly mirror offset
+                    deltaY: override.yOffset, // Explicitly mirror offset
                     scale: override.individualScale,
                     citedRule: override.citedRule,
                     anchorIndex: override.anchorIndex
@@ -209,16 +198,17 @@ const calculateOverrideMetrics = (
 };
 
 const OverrideInspector = ({ 
-    sourceLayers, sourceBounds, targetBounds, strategy 
+    sourceLayers, sourceBounds, targetBounds, strategy, baseline
 }: { 
     sourceLayers: SerializableLayer[], 
     sourceBounds: { x: number, y: number, w: number, h: number }, 
     targetBounds: { x: number, y: number, w: number, h: number }, 
-    strategy: LayoutStrategy 
+    strategy: LayoutStrategy,
+    baseline: BaselineMetrics
 }) => {
     const metrics = useMemo(
-        () => calculateOverrideMetrics(sourceLayers, sourceBounds, targetBounds, strategy),
-        [sourceLayers, sourceBounds, targetBounds, strategy]
+        () => calculateOverrideMetrics(sourceLayers, sourceBounds, targetBounds, strategy, baseline),
+        [sourceLayers, sourceBounds, targetBounds, strategy, baseline]
     );
 
     if (metrics.length === 0) return null;
@@ -243,8 +233,8 @@ const OverrideInspector = ({
                         <div className="flex justify-between items-center mt-1">
                             <span className="text-[8px] text-slate-500">Visual Delta</span>
                             <div className="flex gap-2">
-                                <span className={`text-[8px] font-mono ${Math.abs(m.deltaX) > 1 ? 'text-white' : 'text-slate-600'}`}>ΔX {m.deltaX > 0 ? '+' : ''}{Math.round(m.deltaX)}</span>
-                                <span className={`text-[8px] font-mono ${Math.abs(m.deltaY) > 1 ? 'text-white' : 'text-slate-600'}`}>ΔY {m.deltaY > 0 ? '+' : ''}{Math.round(m.deltaY)}</span>
+                                <span className={`text-[8px] font-mono ${Math.abs(m.deltaX) > 0.1 ? 'text-white' : 'text-slate-600'}`}>ΔX {m.deltaX > 0 ? '+' : ''}{Math.round(m.deltaX)}</span>
+                                <span className={`text-[8px] font-mono ${Math.abs(m.deltaY) > 0.1 ? 'text-white' : 'text-slate-600'}`}>ΔY {m.deltaY > 0 ? '+' : ''}{Math.round(m.deltaY)}</span>
                             </div>
                         </div>
                         {(m.citedRule || m.anchorIndex !== undefined) && (
@@ -307,6 +297,10 @@ const RemapperInstanceRow = memo(({
     const iterativeSource = storePayload?.sourceReference || instance.payload?.sourceReference;
     const isEffectiveGenerating = !!isGeneratingPreview[instance.index] || !!storeIsSynthesizing;
     const hasOverrides = instance.source.aiStrategy?.overrides && instance.source.aiStrategy.overrides.length > 0;
+    
+    // Check if semantic nudges are actually applied (non-zero offsets)
+    const hasSemanticNudge = instance.source.aiStrategy?.overrides?.some(o => Math.abs(o.xOffset) > 0.1 || Math.abs(o.yOffset) > 0.1);
+    
     const audit = useMemo(() => instance.payload?.layers ? getLayerAudit(instance.payload.layers) : null, [instance.payload?.layers]);
 
     return (
@@ -347,10 +341,18 @@ const RemapperInstanceRow = memo(({
                   <div className="flex flex-col w-full pr-4">
                       <div className="flex justify-between items-center">
                           <div className="flex items-center space-x-2">
-                              <span className="text-[10px] text-emerald-400 font-bold tracking-wide">READY</span>
+                              {instance.strategyUsed ? (
+                                  hasSemanticNudge ? (
+                                      <span className="text-[10px] text-pink-300 font-bold tracking-wide">READY (Semantic Nudge)</span>
+                                  ) : (
+                                      <span className="text-[10px] text-emerald-300 font-bold tracking-wide">READY (Baseline Optimized)</span>
+                                  )
+                              ) : (
+                                  <span className="text-[10px] text-emerald-400 font-bold tracking-wide">READY</span>
+                              )}
+                              
                               {instance.strategyUsed && (
                                   <div className="flex items-center gap-1">
-                                      <span className="text-[8px] bg-pink-500/20 text-pink-300 px-1 rounded border border-pink-500/40">AI ENHANCED</span>
                                       {hasOverrides && (
                                           <button onClick={(e) => { e.stopPropagation(); setInspectorOpen(!isInspectorOpen); }} className={`p-0.5 rounded transition-colors ${isInspectorOpen ? 'text-pink-200 bg-pink-500/30' : 'text-slate-500 hover:text-pink-300'}`} title="Toggle Override Inspector"><Info className="w-3 h-3" /></button>
                                       )}
@@ -361,8 +363,8 @@ const RemapperInstanceRow = memo(({
                           </div>
                           <span className="text-[10px] text-slate-400 font-mono">{audit ? `${audit.total} Nodes • ` : ''}{instance.payload.scaleFactor.toFixed(2)}x Scale</span>
                       </div>
-                      <div className={`w-full h-1 rounded overflow-hidden mt-1 ${instance.strategyUsed ? 'bg-pink-900' : 'bg-slate-900'}`}>
-                         <div className={`h-full ${instance.strategyUsed ? 'bg-pink-500' : 'bg-emerald-500'}`} style={{ width: '100%' }}></div>
+                      <div className={`w-full h-1 rounded overflow-hidden mt-1 ${instance.strategyUsed && hasSemanticNudge ? 'bg-pink-900' : 'bg-emerald-900'}`}>
+                         <div className={`h-full ${instance.strategyUsed && hasSemanticNudge ? 'bg-pink-500' : 'bg-emerald-500'}`} style={{ width: '100%' }}></div>
                       </div>
                       {audit && (
                           <div className="flex flex-wrap gap-2 mt-2 select-none">
@@ -371,8 +373,8 @@ const RemapperInstanceRow = memo(({
                               {audit.generative > 0 && <div className="px-2 py-0.5 rounded border border-purple-500/30 bg-purple-900/20 flex items-center space-x-1.5"><Cpu className="w-3 h-3 text-purple-400" /><span className="text-[9px] text-purple-300 font-mono font-medium">{audit.generative} AI Synthetic</span></div>}
                           </div>
                       )}
-                      {isInspectorOpen && instance.source.layers && instance.source.originalBounds && instance.target.bounds && instance.source.aiStrategy && (
-                          <OverrideInspector sourceLayers={instance.source.layers} sourceBounds={instance.source.originalBounds} targetBounds={instance.target.bounds} strategy={instance.source.aiStrategy} />
+                      {isInspectorOpen && instance.source.layers && instance.source.originalBounds && instance.target.bounds && instance.source.aiStrategy && instance.baseline && (
+                          <OverrideInspector sourceLayers={instance.source.layers} sourceBounds={instance.source.originalBounds} targetBounds={instance.target.bounds} strategy={instance.source.aiStrategy} baseline={instance.baseline} />
                       )}
                       {showOverlay && (
                           <div className="mt-2 p-2 bg-slate-900/50 border border-slate-700 rounded flex flex-col space-y-2">
@@ -511,31 +513,25 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                     }
                 }
 
-                let scale = Math.min(targetRect.w / sourceRect.w, targetRect.h / sourceRect.h);
-                let anchorX = targetRect.x + (targetRect.w - (sourceRect.w * scale)) / 2;
-                let anchorY = targetRect.y + (targetRect.h - (sourceRect.h * scale)) / 2;
-
+                // If strategy exists, it may provide overrides, but we default to Baseline (V0)
                 if (strategy) {
-                    scale = strategy.suggestedScale;
                     strategyUsed = true;
-                    const scaledW = sourceRect.w * scale;
-                    const scaledH = sourceRect.h * scale;
-                    anchorX = targetRect.x + (targetRect.w - scaledW) / 2;
-                    if (strategy.anchor === 'TOP') anchorY = targetRect.y;
-                    else if (strategy.anchor === 'BOTTOM') anchorY = targetRect.y + (targetRect.h - scaledH);
-                    else anchorY = targetRect.y + (targetRect.h - scaledH) / 2;
                 }
 
                 const transformLayers = (layers: SerializableLayer[], parentDeltaX = 0, parentDeltaY = 0): TransformedLayer[] => {
                     return layers.map(layer => {
+                        // 1. Calculate Relative Position in Source
                         const relX = (layer.coords.x - sourceRect.x) / sourceRect.w;
                         const relY = (layer.coords.y - sourceRect.y) / sourceRect.h;
-                        const geomX = anchorX + (relX * (sourceRect.w * scale));
-                        const geomY = anchorY + (relY * (sourceRect.h * scale));
-                        let finalX = geomX + parentDeltaX;
-                        let finalY = geomY + parentDeltaY;
-                        let layerScaleX = scale;
-                        let layerScaleY = scale;
+
+                        // 2. Calculate Baseline Position (V0) - The Mathematical Center
+                        const layerBaselineX = baseline!.x + (relX * (sourceRect.w * baseline!.scale));
+                        const layerBaselineY = baseline!.y + (relY * (sourceRect.h * baseline!.scale));
+
+                        let finalX = layerBaselineX + parentDeltaX;
+                        let finalY = layerBaselineY + parentDeltaY;
+                        let layerScaleX = baseline!.scale;
+                        let layerScaleY = baseline!.scale;
                         
                         // SURGICAL SWAP LOGIC: Recursive Mutation
                         // If generation is active, and this layer is the designated swap target...
@@ -560,8 +556,11 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                         }
 
                         if (override) {
-                            finalX = targetRect.x + override.xOffset;
-                            finalY = targetRect.y + override.yOffset;
+                            // PHASE 4: Additive Deltas from Baseline
+                            finalX = layerBaselineX + override.xOffset;
+                            finalY = layerBaselineY + override.yOffset;
+                            
+                            // Scale is multiplicative
                             layerScaleX *= override.individualScale;
                             layerScaleY *= override.individualScale;
                         }
@@ -594,7 +593,7 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                     if (isConfirmed) {
                         requiresGeneration = true;
                         status = 'success';
-                    } else if (strategy?.isExplicitIntent || scale > 2.0) {
+                    } else if (strategy?.isExplicitIntent || baseline && baseline.scale > 2.0) {
                         status = 'awaiting_confirmation';
                     }
                 }
@@ -609,7 +608,7 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                     sourceContainer: sourceData.name,
                     targetContainer: targetData.name,
                     layers: transformedLayers,
-                    scaleFactor: scale,
+                    scaleFactor: baseline ? baseline.scale : 1,
                     metrics: { source: { w: sourceRect.w, h: sourceRect.h }, target: { w: targetRect.w, h: targetRect.h } },
                     targetBounds: { x: targetRect.x, y: targetRect.y, w: targetRect.w, h: targetRect.h },
                     requiresGeneration,
