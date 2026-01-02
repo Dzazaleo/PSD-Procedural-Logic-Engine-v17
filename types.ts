@@ -93,6 +93,7 @@ export interface LayoutStrategy {
   reasoning: string;
   overrides?: LayerOverride[];
   directives?: string[]; // Phase 4B: Mandatory Knowledge Directives (e.g. MANDATORY_GEN_FILL)
+  replaceLayerId?: string; // Phase 4C: Surgical Swap Target ID
   safetyReport?: {
     allowedBleed: boolean;
     violationCount: number;

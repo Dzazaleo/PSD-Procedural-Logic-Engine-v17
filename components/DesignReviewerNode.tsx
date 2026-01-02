@@ -471,6 +471,12 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
             2. SNAP ENFORCEMENT: If 'ZERO_GAP_ALIGNMENT' or 'NO_GAPS' directive is active, identify any gaps > 0px between structural elements.
             3. DRIFT CORRECTION: If a gap is detected between "snapped" layers, calculate the precise xOffset/yOffset required to achieve a 0px delta. Prioritize moving the secondary layer (child) to meet the primary (parent).
             
+            GHOST IDENTITY PROTOCOL (Surgical Swap Recognition):
+            1. IDENTIFY: Layers with type='generative' are "Ghost Assets" acting as the legal representative of an original layer.
+            2. AUDIT: Treat Ghost Assets as the original rigid layer for all geometric checks.
+            3. EQUILIBRIUM: Ensure the AI texture fills the original bounds without awkward tangents.
+            4. ATTRIBUTION: If nudging a Ghost Asset, your 'citedRule' MUST reference the original layer name + "(AI Swapped)" (e.g., "Adjusted [Layer Name] (AI Swapped) to align...").
+
             YOUR JOB:
             Identify aesthetic collisions (e.g., text overlapping objects, awkward tangents, visual imbalance) and geometric drifts.
             Provide precise 'nudges' (offsets, scale adjustments) to achieve Optical Equilibrium.

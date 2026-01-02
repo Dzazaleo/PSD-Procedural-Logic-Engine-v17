@@ -4,7 +4,7 @@ import { PSDNodeData, LayoutStrategy, SerializableLayer, ChatMessage, AnalystIns
 import { useProceduralStore } from '../store/ProceduralContext';
 import { getSemanticThemeObject, findLayerByPath } from '../services/psdService';
 import { GoogleGenAI, Type } from "@google/genai";
-import { Brain, BrainCircuit, Ban, ClipboardList, AlertCircle } from 'lucide-react';
+import { Brain, BrainCircuit, Ban, ClipboardList, AlertCircle, RefreshCw } from 'lucide-react';
 import { Psd } from 'ag-psd';
 
 // Define the exact union type for model keys to match PSDNodeData
@@ -83,6 +83,14 @@ const StrategyCard: React.FC<{ strategy: LayoutStrategy, modelConfig: ModelConfi
                      <span className="text-[9px] px-1.5 py-0.5 rounded border border-blue-500 text-blue-300 bg-blue-900/20 font-mono font-bold" title="Source Pixels Attached">
                         REF ATTACHED
                      </span>
+                )}
+                {strategy.replaceLayerId && (
+                    <div className="flex items-center space-x-1 px-1.5 py-0.5 rounded border border-red-500/50 bg-red-900/20">
+                        <RefreshCw className="w-2.5 h-2.5 text-red-400" />
+                        <span className="text-[9px] text-red-300 font-mono font-bold" title={`Replaces layer ${strategy.replaceLayerId}`}>
+                            SWAP
+                        </span>
+                    </div>
                 )}
              </div>
 
@@ -615,6 +623,9 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         OPERATIONAL CONSTRAINTS:
         - NO NEW ELEMENTS: Strictly forbidden unless 'GENERATIVE' method is forced by Knowledge.
         - NO DELETION: Strictly forbidden. Every layer in the JSON must remain visible and accounted for.
+        - SURGICAL SWAP EXCEPTION: If 'GENERATIVE' or 'HYBRID' method is selected, you MAY identify one specific 'replaceLayerId' from the input to be replaced by the AI output.
+          * The AI output will inherit the Z-index and name of the 'replaceLayerId'.
+          * This is the ONLY context where deletion/replacement is permitted.
         - NO CROPPING: Strictly forbidden. Use scale and position only.
         - METHOD 'GEOMETRIC': 'generativePrompt' MUST be "".
 
@@ -707,6 +718,10 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
                         items: { type: Type.STRING },
                         description: "List of mandatory constants extracted from Knowledge rules (e.g. MANDATORY_GEN_FILL)"
                     },
+                    replaceLayerId: { 
+                        type: Type.STRING,
+                        description: "If GENERATIVE/HYBRID, the exact layerId to replace with the generated asset. Leave empty if no replacement." 
+                    },
                     overrides: {
                         type: Type.ARRAY,
                         items: {
@@ -731,7 +746,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
                         required: ['allowedBleed', 'violationCount']
                     }
                 },
-                required: ['reasoning', 'method', 'suggestedScale', 'anchor', 'generativePrompt', 'clearance', 'overrides', 'safetyReport', 'knowledgeApplied', 'directives']
+                required: ['reasoning', 'method', 'suggestedScale', 'anchor', 'generativePrompt', 'clearance', 'overrides', 'safetyReport', 'knowledgeApplied', 'directives', 'replaceLayerId']
             }
         };
         
