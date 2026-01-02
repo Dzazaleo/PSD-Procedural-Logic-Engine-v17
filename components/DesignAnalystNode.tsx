@@ -157,9 +157,6 @@ const StrategyCard: React.FC<{ strategy: LayoutStrategy, modelConfig: ModelConfi
 const InstanceRow: React.FC<any> = ({ 
     nodeId, index, state, sourceData, targetData, onAnalyze, onRefine, onModelChange, onToggleMute, isAnalyzing, compactMode, activeKnowledge 
 }) => {
-    // ... (UI Code same as previous, abbreviated for clarity)
-    // ...
-    // ...
     const [inputText, setInputText] = useState('');
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const activeModelConfig = MODELS[state.selectedModel as ModelKey];
@@ -173,6 +170,36 @@ const InstanceRow: React.FC<any> = ({
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
         }
     }, [state.chatHistory.length, isAnalyzing]);
+
+    // STRICT EVENT FIREWALL: Prevents scroll from bubbling to React Flow viewport
+    useEffect(() => {
+        const container = chatContainerRef.current;
+        if (!container) return;
+        
+        const handleWheel = (e: WheelEvent) => {
+            // Stop propagation to prevent React Flow from seeing the event and zooming
+            e.stopPropagation();
+            
+            // Check if content is actually scrollable
+            const isScrollable = container.scrollHeight > container.clientHeight;
+            if (!isScrollable) return;
+
+            const { scrollTop, scrollHeight, clientHeight } = container;
+            const delta = e.deltaY;
+            
+            // Prevent default (viewport zoom) only when we are actively scrolling internal content
+            // This prevents the "bounce" from triggering a zoom-out at the top/bottom
+            const isAtTop = delta < 0 && scrollTop <= 0;
+            const isAtBottom = delta > 0 && scrollTop + clientHeight >= scrollHeight;
+
+            if (!isAtTop && !isAtBottom) {
+                // We are mid-scroll; prevent the browser/React Flow from zooming
+            }
+        };
+
+        container.addEventListener('wheel', handleWheel, { passive: false });
+        return () => container.removeEventListener('wheel', handleWheel);
+    }, []);
     
     // ... (Handle Refine, Scroll Logic) ...
     const handleRefineClick = (e: React.MouseEvent) => {
@@ -286,7 +313,12 @@ const InstanceRow: React.FC<any> = ({
                 </div>
 
                 {/* Chat Console */}
-                <div ref={chatContainerRef} className={`nodrag nopan ${compactMode ? 'h-48' : 'h-64'} overflow-y-auto border border-slate-700 bg-slate-900 rounded p-3 space-y-3 custom-scrollbar transition-all shadow-inner cursor-auto`} onMouseDown={(e) => e.stopPropagation()}>
+                <div 
+                    ref={chatContainerRef} 
+                    className={`nodrag nopan ${compactMode ? 'h-48' : 'h-64'} overflow-y-auto border border-slate-700 bg-slate-900 rounded p-3 space-y-3 custom-scrollbar transition-all shadow-inner cursor-auto relative z-10`}
+                    onWheel={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                >
                     {state.chatHistory.length === 0 && (
                         <div className="h-full flex flex-col items-center justify-center text-slate-600 italic text-xs opacity-50"><span>Ready to analyze {targetData?.name || 'slot'}</span></div>
                     )}
@@ -621,7 +653,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
     let prompt = `
         ROLE: Senior Visual Systems Lead & Expert Graphic Designer.
-        GOAL: Perform "Knowledge-Anchored Semantic Recomposition" (75% Knowledge / 25% Optical).
+        GOAL: Perform "Vision-Led Semantic Recomposition" (75% Optical / 25% Knowledge).
         
         CONTAINER CONTEXT:
         - Source: ${sourceData.container.containerName} (${sourceW}x${sourceH})
@@ -645,12 +677,13 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         - Do NOT provide absolute coordinates.
 
         HYBRID REASONING PROTOCOL (75/25 SPLIT):
-        1. PRIMARY (75%): KNOWLEDGE ADHERENCE.
-           - Strictly follow the container-specific rules provided below.
-           - If a rule implies specific padding (e.g. "100px from top"), calculate the necessary delta from the centered V0 to achieve it.
-        2. SECONDARY (25%): OPTICAL EQUILIBRIUM.
-           - Use the visual input to detect awkward tangents, overlapping text, or weight imbalances that pure math cannot see.
-           - Apply micro-nudges to resolve these friction points.
+        1. PRIMARY (75%): OPTICAL EQUILIBRIUM (VISION).
+           - Prioritize the visual harmony, depth, and spatial relationships seen in the composite image.
+           - Use your visual priority to identify the most prominent assets (e.g., Potions) and scale them to dominate the scene.
+           - Place secondary assets (Prizes) by visually 'locking' onto the physical features of the main assets (e.g., the potion belly) detected in the image.
+        2. SECONDARY (25%): KNOWLEDGE & RULES.
+           - Treat textual rules as high-level guidance that supports, but does not override, a superior visual solution discovered via Vision.
+           - Ensure brand constraints act as safety rails, not blockades.
 
         DIRECTIVE EXTRACTION PROTOCOL:
         Analyze the Knowledge Rules below for mandatory constraints (keywords: MUST, SHALL, REQUIRED).
@@ -756,7 +789,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
                 properties: {
                     reasoning: { 
                         type: Type.STRING,
-                        description: `MANDATORY: A professional 'Design Audit' paragraph. Must cite the Baseline and 75/25 Hybrid Logic.`
+                        description: `MANDATORY: A professional 'Design Audit' paragraph. Explain how your visual analysis (75%) drove the primary placement and how the brand rules (25%) were integrated as secondary constraints.`
                     },
                     method: { type: Type.STRING, enum: ['GEOMETRIC', 'GENERATIVE', 'HYBRID'] },
                     suggestedScale: { type: Type.NUMBER },

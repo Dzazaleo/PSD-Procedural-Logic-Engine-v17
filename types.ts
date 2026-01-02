@@ -208,6 +208,9 @@ export interface TransformedPayload {
   
   // GBP: Phase 2 Baseline Persistence
   baseline?: BaselineMetrics;
+  
+  // Phase 5: CARO Context
+  aiStrategy?: LayoutStrategy; // Travels with payload to inform Reviewer
 }
 
 export interface RemapperConfig {

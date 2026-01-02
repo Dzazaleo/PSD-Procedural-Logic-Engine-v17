@@ -210,6 +210,21 @@ const OverrideInspector = ({
         () => calculateOverrideMetrics(sourceLayers, sourceBounds, targetBounds, strategy, baseline),
         [sourceLayers, sourceBounds, targetBounds, strategy, baseline]
     );
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    // Strict Event Firewall: Prevents scroll from bubbling to React Flow viewport
+    useEffect(() => {
+        const container = scrollRef.current;
+        if (!container) return;
+        
+        const handleWheel = (e: WheelEvent) => {
+            // Stop propagation to prevent React Flow from seeing the event and zooming
+            e.stopPropagation();
+        };
+
+        container.addEventListener('wheel', handleWheel, { passive: false });
+        return () => container.removeEventListener('wheel', handleWheel);
+    }, []);
 
     if (metrics.length === 0) return null;
 
@@ -221,7 +236,12 @@ const OverrideInspector = ({
                 </span>
                 <span className="text-[9px] text-pink-400/70 font-mono">{metrics.length} Layers</span>
             </div>
-            <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+            <div 
+                ref={scrollRef}
+                className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar pr-1 nodrag nopan relative z-10"
+                onWheel={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+            >
                 {metrics.map(m => (
                     <div key={m.layerId} className="flex flex-col bg-slate-900/40 p-1.5 rounded border border-pink-500/10">
                         <div className="flex justify-between items-center">
@@ -622,7 +642,8 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                     directives: strategy?.directives, // Propagate Directives
                     isMandatory: isMandatory, // Propagate Mandatory Flag
                     replaceLayerId: strategy?.replaceLayerId, // Track swapped ID
-                    baseline // Inject Baseline
+                    baseline, // Inject Baseline
+                    aiStrategy: strategy // Inject Strategy for Reviewer
                 };
             }
             result.push({ index: i, source: sourceData, target: targetData, payload, strategyUsed, baseline });

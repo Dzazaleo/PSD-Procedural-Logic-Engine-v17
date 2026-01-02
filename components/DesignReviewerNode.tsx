@@ -5,7 +5,7 @@ import { useProceduralStore } from '../store/ProceduralContext';
 import { findLayerByPath } from '../services/psdService';
 import { GoogleGenAI, Type } from "@google/genai";
 import { Psd } from 'ag-psd';
-import { Activity, ShieldCheck, Maximize, RotateCw, ArrowRight, ScanEye, BookOpen } from 'lucide-react';
+import { Activity, ShieldCheck, Maximize, RotateCw, ArrowRight, ScanEye, BookOpen, Brain } from 'lucide-react';
 
 const DEFAULT_REVIEWER_STATE: ReviewerInstanceState = {
     chatHistory: [],
@@ -187,11 +187,19 @@ const ReviewerInstanceRow: React.FC<{
     const { registerReviewerPayload } = useProceduralStore();
     const lastProcessedGenerationId = useRef<number | undefined>(undefined);
 
-    // Isolated Scroll
+    // Detect Strategic Insight from Analyst
+    const hasStrategicInsight = incomingPayload?.aiStrategy?.knowledgeApplied || false;
+
+    // Strict Event Firewall: Prevents scroll from bubbling to React Flow viewport
     useEffect(() => {
         const container = chatContainerRef.current;
         if (!container) return;
-        const handleWheel = (e: WheelEvent) => e.stopPropagation();
+        
+        const handleWheel = (e: WheelEvent) => {
+            // Stop propagation to prevent React Flow from seeing the event and zooming
+            e.stopPropagation();
+        };
+
         container.addEventListener('wheel', handleWheel, { passive: false });
         return () => container.removeEventListener('wheel', handleWheel);
     }, []);
@@ -234,8 +242,6 @@ const ReviewerInstanceRow: React.FC<{
             });
             
             // Sync store to remove old polished data immediately
-            // Note: The main effect below will also catch the strategy nullification, 
-            // but we update ref here to acknowledge the new state.
             lastProcessedGenerationId.current = currentGenId;
         }
     }, [incomingPayload?.generationId, index, onUpdateState, state.chatHistory]);
@@ -283,20 +289,29 @@ const ReviewerInstanceRow: React.FC<{
                         {incomingPayload?.targetContainer || `Auditor ${index + 1}`}
                     </span>
                 </div>
-                {/* Active Directives Badge */}
-                {incomingPayload?.directives && incomingPayload.directives.length > 0 && (
-                    <div className="flex items-center space-x-1 pr-2">
-                        <BookOpen className="w-3 h-3 text-teal-400" />
-                        <span className="text-[8px] text-teal-300 font-mono">{incomingPayload.directives.length} Rules Active</span>
-                    </div>
-                )}
+                {/* Strategic Insight Badge */}
+                <div className="flex items-center space-x-2 pr-2">
+                    {hasStrategicInsight && (
+                        <div className="flex items-center gap-1 bg-purple-900/40 border border-purple-500/40 px-1.5 py-0.5 rounded text-[8px] text-purple-300 font-mono tracking-wider animate-pulse-slow">
+                            <Brain className="w-2.5 h-2.5" />
+                            <span>STRATEGY AWARE</span>
+                        </div>
+                    )}
+                    {incomingPayload?.directives && incomingPayload.directives.length > 0 && (
+                        <div className="flex items-center space-x-1">
+                            <BookOpen className="w-3 h-3 text-teal-400" />
+                            <span className="text-[8px] text-teal-300 font-mono">{incomingPayload.directives.length} Rules Active</span>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Audit Console */}
             <div 
                 ref={chatContainerRef}
-                className="h-32 bg-black/60 border border-emerald-900/50 rounded-md p-2 overflow-y-auto custom-scrollbar font-mono text-[9px] leading-tight space-y-2 cursor-auto shadow-inner"
+                className="h-32 bg-black/60 border border-emerald-900/50 rounded-md p-2 overflow-y-auto custom-scrollbar font-mono text-[9px] leading-tight space-y-2 cursor-auto shadow-inner nodrag nopan relative z-10"
                 onMouseDown={e => e.stopPropagation()}
+                onWheel={e => e.stopPropagation()}
             >
                 {state.chatHistory.length === 0 ? (
                     <div className="h-full flex items-center justify-center text-emerald-900/50 italic">
@@ -453,14 +468,28 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
               type: l.type
           }));
 
+          // PHASE 5: CARO Calibration
+          // Inject Analyst Strategy Context
+          const analystLogic = payload.aiStrategy?.reasoning || "Geometric Baseline Fit (V0)";
+          const directives = payload.directives || [];
+
           const prompt = `
             ROLE: CARO (Chief Aesthetic Reconciliation Officer).
-            TASK: Optical Audit & Surgical Correction.
+            GOAL: Provide a final Optical Audit of the Analyst's work.
+            
+            ANALYST STRATEGY (CONTEXT):
+            "${analystLogic}"
+            
+            THE POLISH CONSTRAINT:
+            - You are the secondary auditor. The Analyst (Primary) has already applied 75% Knowledge / 25% Vision logic.
+            - You must respect the Analyst's reasoning unless it creates a clear aesthetic violation (e.g. text overlapping an image edge, tangible 1px gaps).
+            - Prime Directive: Do not redo the layout. Only provide micro-nudges to resolve visual friction.
+            - DELTA LIMIT: Keep offsets small (strictly within ±15px). Do not move elements to new quadrants.
             
             CONTEXT:
             - Target Container: ${payload.targetContainer}
             - Current Scale Factor: ${payload.scaleFactor}
-            - Active Directives: ${JSON.stringify(payload.directives || [])}
+            - Active Directives: ${JSON.stringify(directives)}
             
             INPUT:
             1. An image of the current procedural layout (Rendered).
@@ -490,7 +519,7 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
             
             OUTPUT JSON:
             {
-                "CARO_Audit": "Brief, clinical report of friction points found (e.g., 'Corrected overlap between Prize Text and Bottle neck').",
+                "CARO_Audit": "Brief, clinical report of friction points found (e.g., 'Corrected overlap between Prize Text and Bottle neck'). Mention if you upheld or refined the Analyst's logic.",
                 "overrides": [
                     { 
                         "layerId": "string (must match input)", 
