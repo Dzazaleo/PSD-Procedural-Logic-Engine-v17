@@ -209,17 +209,29 @@ const ReviewerInstanceRow: React.FC<{
 
     return (
         <div className="relative border-b border-emerald-900/30 bg-slate-900/40 p-3 space-y-3">
-            {/* Headers & Wiring */}
+            {/* Docked Input Handles (Absolute Positioned) */}
+            <Handle 
+                type="target" 
+                position={Position.Left} 
+                id={`payload-in-${index}`} 
+                className="!absolute !-left-1.5 !top-4 !w-3 !h-3 !rounded-full !bg-indigo-500 !border-2 !border-slate-900 z-50" 
+                title="Input: Transformed Payload" 
+            />
+            <Handle 
+                type="target" 
+                position={Position.Left} 
+                id={`target-in-${index}`} 
+                className="!absolute !-left-1.5 !top-9 !w-3 !h-3 !rounded-full !bg-emerald-500 !border-2 !border-slate-900 z-50" 
+                title="Input: Target Definition" 
+            />
+
+            {/* Headers */}
             <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 pl-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981]"></div>
                     <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">
                         {incomingPayload?.targetContainer || `Auditor ${index + 1}`}
                     </span>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <Handle type="target" position={Position.Left} id={`payload-in-${index}`} className="!static !w-2.5 !h-2.5 !rounded-full !bg-indigo-500 !border-2 !border-slate-900" title="Input: Transformed Payload" />
-                    <Handle type="target" position={Position.Left} id={`target-in-${index}`} className="!static !w-2.5 !h-2.5 !rounded-full !bg-emerald-500 !border-2 !border-slate-900" title="Input: Target Definition" />
                 </div>
             </div>
 

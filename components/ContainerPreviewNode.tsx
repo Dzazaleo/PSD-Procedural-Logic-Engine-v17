@@ -156,14 +156,22 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
       </div>
 
       {/* Input Handles Area - Darker, cleaner */}
-      <div className="relative h-8 bg-slate-950 border-b border-slate-800 flex items-center px-2 justify-between">
-          <div className="flex items-center gap-4">
-              <div className="relative flex items-center">
-                  <Handle type="target" position={Position.Left} id="payload-in" className="!static !w-2.5 !h-2.5 !rounded-full !bg-indigo-500 !border-2 !border-slate-800" title="Input: Transformed Payload" />
+      <div className="relative h-10 bg-slate-950 border-b border-slate-800 flex items-center px-2 justify-between">
+          {/* Docked Handles */}
+          <Handle type="target" position={Position.Left} id="payload-in" 
+              className="!absolute !-left-1.5 !top-2.5 !w-3 !h-3 !rounded-full !bg-indigo-500 !border-2 !border-slate-900 z-50" 
+              title="Input: Transformed Payload" 
+          />
+          <Handle type="target" position={Position.Left} id="target-in" 
+              className="!absolute !-left-1.5 !top-7 !w-3 !h-3 !rounded-full !bg-emerald-500 !border-2 !border-slate-900 z-50" 
+              title="Input: Target Definition" 
+          />
+
+          <div className="flex items-center gap-4 pl-3">
+              <div className="flex items-center">
                   <span className="text-[9px] text-slate-500 font-mono ml-1.5 font-bold tracking-wider">PAYLOAD</span>
               </div>
-              <div className="relative flex items-center">
-                  <Handle type="target" position={Position.Left} id="target-in" className="!static !w-2.5 !h-2.5 !rounded-full !bg-emerald-500 !border-2 !border-slate-800" title="Input: Target Definition" />
+              <div className="flex items-center">
                   <span className="text-[9px] text-slate-500 font-mono ml-1.5 font-bold tracking-wider">TARGET</span>
               </div>
           </div>
