@@ -218,8 +218,8 @@ const ReviewerInstanceRow: React.FC<{
                     </span>
                 </div>
                 <div className="flex items-center space-x-2">
-                    <Handle type="target" position={Position.Left} id={`payload-in-${index}`} className="!static !w-2.5 !h-2.5 !rounded-full !bg-indigo-500 !border-2 !border-slate-800" title="Input: Transformed Payload" />
-                    <Handle type="target" position={Position.Left} id={`target-in-${index}`} className="!static !w-2.5 !h-2.5 !rounded-full !bg-emerald-500 !border-2 !border-slate-800" title="Input: Target Definition" />
+                    <Handle type="target" position={Position.Left} id={`payload-in-${index}`} className="!static !w-2.5 !h-2.5 !rounded-full !bg-indigo-500 !border-2 !border-slate-900" title="Input: Transformed Payload" />
+                    <Handle type="target" position={Position.Left} id={`target-in-${index}`} className="!static !w-2.5 !h-2.5 !rounded-full !bg-emerald-500 !border-2 !border-slate-900" title="Input: Target Definition" />
                 </div>
             </div>
 
@@ -462,7 +462,7 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
 
   return (
     <div className="w-[400px] bg-slate-900 rounded-lg shadow-2xl border border-emerald-500/50 font-sans flex flex-col overflow-hidden transition-all hover:shadow-emerald-900/20 hover:border-emerald-400 group">
-      <NodeResizer minWidth={400} minHeight={300} isVisible={true} lineStyle={{ border: 'none' }} handleStyle={{ background: 'transparent' }} />
+      <NodeResizer minWidth={400} minHeight={300} isVisible={false} />
       
       {/* Header - High Fidelity with Noise Overlay */}
       <div className="relative bg-emerald-950/80 backdrop-blur-md p-2 border-b border-emerald-500/30 flex items-center justify-between shrink-0 overflow-hidden">

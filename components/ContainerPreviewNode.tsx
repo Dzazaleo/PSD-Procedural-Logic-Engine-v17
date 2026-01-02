@@ -128,7 +128,7 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
             : 'border-emerald-500/50 shadow-emerald-900/20 hover:border-emerald-400'
         }`}
     >
-      <NodeResizer minWidth={300} minHeight={300} isVisible={true} lineStyle={{ border: 'none' }} handleStyle={{ background: 'transparent' }} />
+      <NodeResizer minWidth={300} minHeight={300} isVisible={false} />
 
       {/* Header - High Fidelity with Noise */}
       <div className={`relative p-2 border-b flex items-center justify-between shrink-0 overflow-hidden backdrop-blur-md
