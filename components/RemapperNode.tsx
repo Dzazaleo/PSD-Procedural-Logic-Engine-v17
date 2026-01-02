@@ -1,6 +1,6 @@
 import React, { memo, useMemo, useEffect, useCallback, useState, useRef } from 'react';
 import { Handle, Position, NodeProps, useEdges, useReactFlow, useNodes, useUpdateNodeInternals } from 'reactflow';
-import { PSDNodeData, SerializableLayer, TransformedPayload, TransformedLayer, MAX_BOUNDARY_VIOLATION_PERCENT, LayoutStrategy } from '../types';
+import { PSDNodeData, SerializableLayer, TransformedPayload, TransformedLayer, MAX_BOUNDARY_VIOLATION_PERCENT, LayoutStrategy, LayerOverride } from '../types';
 import { useProceduralStore } from '../store/ProceduralContext';
 import { GoogleGenAI } from "@google/genai";
 import { Check, Sparkles, Info, Layers, Box, Cpu, BookOpen, Link as LinkIcon } from 'lucide-react';
@@ -28,13 +28,14 @@ interface InstanceData {
 }
 
 // --- SUB-COMPONENT: Generative Preview Overlay ---
+// (No changes to Overlay component, reused from previous state)
 interface OverlayProps {
     previewUrl?: string | null;
-    canonicalUrl?: string | null; // The URL currently locked in the store
+    canonicalUrl?: string | null; 
     isGenerating: boolean;
     scale: number;
     onConfirm: (url?: string) => void;
-    isStoreConfirmed: boolean; // The confirmation state of the store payload
+    isStoreConfirmed: boolean; 
     targetDimensions?: { w: number, h: number };
     sourceReference?: string;
     onImageLoad?: () => void;
@@ -53,36 +54,21 @@ const GenerativePreviewOverlay = ({
     generationId
 }: OverlayProps) => {
     const { w, h } = targetDimensions || { w: 1, h: 1 };
-    
-    // STRICT CONFIRMATION LOGIC:
-    // A view is confirmed ONLY if it matches the store's canonical URL AND the store is confirmed.
     const isCurrentViewConfirmed = !!previewUrl && !!canonicalUrl && previewUrl === canonicalUrl && isStoreConfirmed;
-
-    // Button Visibility:
-    // Show 'Confirm' if the current view is NOT the confirmed one.
     const showConfirmButton = !!previewUrl && !isCurrentViewConfirmed && !isGenerating;
 
     return (
         <div className={`relative w-full mt-2 rounded-md overflow-hidden bg-slate-900/50 border transition-all duration-500 flex justify-center flex-col items-center ${isGenerating ? 'border-indigo-500/30' : 'border-purple-500/50'}`}>
              <div 
                 className="relative w-full max-w-full flex items-center justify-center overflow-hidden group shadow-inner bg-black/20"
-                style={{
-                    aspectRatio: `${w} / ${h}`,
-                    maxHeight: '280px'
-                }}
+                style={{ aspectRatio: `${w} / ${h}`, maxHeight: '280px' }}
              >
                  {sourceReference && (
                      <div className="absolute top-2 left-2 z-20 flex flex-col items-start group/source pointer-events-none">
                         <div className="bg-black/60 backdrop-blur-md border border-white/20 p-0.5 rounded shadow-xl transition-transform transform group-hover/source:scale-150 origin-top-left">
-                             <img 
-                                src={sourceReference} 
-                                alt="Style Source" 
-                                className="w-8 h-8 object-cover rounded-[1px] border border-white/10" 
-                             />
+                             <img src={sourceReference} alt="Style Source" className="w-8 h-8 object-cover rounded-[1px] border border-white/10" />
                         </div>
-                        <span className="text-[7px] text-white/50 font-mono mt-1 bg-black/60 px-1 rounded border border-white/5 uppercase tracking-wider">
-                            Source
-                        </span>
+                        <span className="text-[7px] text-white/50 font-mono mt-1 bg-black/60 px-1 rounded border border-white/5 uppercase tracking-wider">Source</span>
                      </div>
                  )}
                  
@@ -91,12 +77,8 @@ const GenerativePreviewOverlay = ({
                         src={previewUrl} 
                         onLoad={onImageLoad}
                         alt="AI Ghost" 
-                        key={generationId} // Force remount on new generation for instant update
-                        className={`w-full h-full object-contain transition-all duration-700 
-                            ${isCurrentViewConfirmed 
-                                ? 'opacity-100 grayscale-0 mix-blend-normal' 
-                                : 'opacity-100 grayscale-0 mix-blend-normal'
-                            }`}
+                        key={generationId}
+                        className={`w-full h-full object-contain transition-all duration-700 ${isCurrentViewConfirmed ? 'opacity-100 grayscale-0 mix-blend-normal' : 'opacity-100 grayscale-0 mix-blend-normal'}`}
                      />
                  ) : (
                      <div className="absolute inset-0 flex items-center justify-center z-0">
@@ -112,7 +94,6 @@ const GenerativePreviewOverlay = ({
                      </div>
                  )}
 
-                 {/* ACTION UTILITY BAR: Standardized Confirmation */}
                  {showConfirmButton && (
                      <div className="absolute top-2 right-2 z-40 flex flex-col items-end transition-opacity duration-300 opacity-100">
                          <button 
@@ -120,20 +101,14 @@ const GenerativePreviewOverlay = ({
                             className="bg-indigo-600/90 hover:bg-indigo-500 text-white p-1.5 rounded shadow-[0_4px_10px_rgba(0,0,0,0.3)] border border-white/20 transform hover:scale-105 active:scale-95 transition-all flex items-center space-x-1.5 backdrop-blur-[2px]"
                             title="Commit this draft"
                          >
-                            <span className="text-[9px] font-bold uppercase tracking-wider leading-none">
-                                Confirm
-                            </span>
+                            <span className="text-[9px] font-bold uppercase tracking-wider leading-none">Confirm</span>
                             <Check className="w-3 h-3 text-emerald-300" strokeWidth={3} />
                          </button>
                      </div>
                  )}
 
                  <div className="absolute bottom-2 left-2 z-20 flex items-center space-x-2 pointer-events-none">
-                     <span className={`text-[8px] px-1.5 py-0.5 rounded border backdrop-blur-sm shadow-[0_0_8px_rgba(0,0,0,0.5)]
-                        ${isCurrentViewConfirmed
-                            ? 'bg-emerald-900/80 text-emerald-200 border-emerald-500/50' 
-                            : 'bg-purple-900/80 text-purple-200 border-purple-500/50'
-                        }`}>
+                     <span className={`text-[8px] px-1.5 py-0.5 rounded border backdrop-blur-sm shadow-[0_0_8px_rgba(0,0,0,0.5)] ${isCurrentViewConfirmed ? 'bg-emerald-900/80 text-emerald-200 border-emerald-500/50' : 'bg-purple-900/80 text-purple-200 border-purple-500/50'}`}>
                          {isCurrentViewConfirmed ? 'CONFIRMED' : 'PREVIEW'}
                      </span>
                      {isGenerating && (
@@ -160,10 +135,7 @@ const GenerativePreviewOverlay = ({
     );
 };
 
-// ... OverrideInspector and getLayerAudit helpers remain the same ...
-// For brevity, skipping full re-implementation of UI subcomponents that didn't change logic.
-// Assuming they are present in the final file.
-
+// ... OverrideInspector and helpers ...
 interface OverrideMetric {
     layerId: string;
     name: string;
@@ -174,8 +146,8 @@ interface OverrideMetric {
     deltaX: number;
     deltaY: number;
     scale: number;
-    citedRule?: string; // New: Textual rule attribution
-    anchorIndex?: number; // New: Visual anchor reference
+    citedRule?: string;
+    anchorIndex?: number;
 }
 
 const calculateOverrideMetrics = (
@@ -187,7 +159,6 @@ const calculateOverrideMetrics = (
     const metrics: OverrideMetric[] = [];
     if (!strategy.overrides || strategy.overrides.length === 0) return metrics;
 
-    // 1. Calculate Geometric Baseline
     const ratioX = targetRect.w / sourceRect.w;
     const ratioY = targetRect.h / sourceRect.h;
     let globalScale = Math.min(ratioX, ratioY);
@@ -204,19 +175,14 @@ const calculateOverrideMetrics = (
         else anchorY = targetRect.y + (targetRect.h - scaledH) / 2;
     }
 
-    // 2. Recursive Traversal
     const traverse = (layers: SerializableLayer[]) => {
         layers.forEach(layer => {
             const override = strategy.overrides?.find(o => o.layerId === layer.id);
-            
             if (override) {
-                // Geometric Position
                 const relX = (layer.coords.x - sourceRect.x) / sourceRect.w;
                 const relY = (layer.coords.y - sourceRect.y) / sourceRect.h;
                 const geomX = anchorX + (relX * (sourceRect.w * globalScale));
                 const geomY = anchorY + (relY * (sourceRect.h * globalScale));
-
-                // Semantic Position
                 const finalX = targetRect.x + override.xOffset;
                 const finalY = targetRect.y + override.yOffset;
 
@@ -234,11 +200,9 @@ const calculateOverrideMetrics = (
                     anchorIndex: override.anchorIndex
                 });
             }
-
             if (layer.children) traverse(layer.children);
         });
     };
-
     traverse(sourceLayers);
     return metrics;
 };
@@ -273,39 +237,27 @@ const OverrideInspector = ({
                             <span className="text-[9px] text-slate-300 font-medium truncate max-w-[120px]" title={m.name}>
                                 {m.name}
                             </span>
-                            <span className="text-[8px] text-pink-400 font-mono">
-                                Scale: {m.scale.toFixed(2)}x
-                            </span>
+                            <span className="text-[8px] text-pink-400 font-mono">Scale: {m.scale.toFixed(2)}x</span>
                         </div>
                         <div className="flex justify-between items-center mt-1">
                             <span className="text-[8px] text-slate-500">Visual Delta</span>
                             <div className="flex gap-2">
-                                <span className={`text-[8px] font-mono ${Math.abs(m.deltaX) > 1 ? 'text-white' : 'text-slate-600'}`}>
-                                    ΔX {m.deltaX > 0 ? '+' : ''}{Math.round(m.deltaX)}
-                                </span>
-                                <span className={`text-[8px] font-mono ${Math.abs(m.deltaY) > 1 ? 'text-white' : 'text-slate-600'}`}>
-                                    ΔY {m.deltaY > 0 ? '+' : ''}{Math.round(m.deltaY)}
-                                </span>
+                                <span className={`text-[8px] font-mono ${Math.abs(m.deltaX) > 1 ? 'text-white' : 'text-slate-600'}`}>ΔX {m.deltaX > 0 ? '+' : ''}{Math.round(m.deltaX)}</span>
+                                <span className={`text-[8px] font-mono ${Math.abs(m.deltaY) > 1 ? 'text-white' : 'text-slate-600'}`}>ΔY {m.deltaY > 0 ? '+' : ''}{Math.round(m.deltaY)}</span>
                             </div>
                         </div>
-                        
-                        {/* New: Attribution UI */}
                         {(m.citedRule || m.anchorIndex !== undefined) && (
                             <div className="mt-1.5 pt-1.5 border-t border-slate-700/50 space-y-1">
                                 {m.citedRule && (
                                     <div className="flex items-start gap-1">
                                         <BookOpen className="w-2.5 h-2.5 text-teal-400 mt-0.5 shrink-0" />
-                                        <span className="text-[8px] text-teal-200/90 leading-tight italic">
-                                            "{m.citedRule}"
-                                        </span>
+                                        <span className="text-[8px] text-teal-200/90 leading-tight italic">"{m.citedRule}"</span>
                                     </div>
                                 )}
                                 {m.anchorIndex !== undefined && (
                                     <div className="flex items-center gap-1 bg-black/20 px-1 py-0.5 rounded w-fit">
                                         <LinkIcon className="w-2.5 h-2.5 text-blue-400" />
-                                        <span className="text-[8px] text-blue-300 font-mono">
-                                            Linked to Anchor #{m.anchorIndex}
-                                        </span>
+                                        <span className="text-[8px] text-blue-300 font-mono">Linked to Anchor #{m.anchorIndex}</span>
                                     </div>
                                 )}
                             </div>
@@ -321,154 +273,74 @@ const getLayerAudit = (layers: TransformedLayer[]) => {
   let pixel = 0;
   let group = 0;
   let generative = 0;
-
   const traverse = (nodes: TransformedLayer[]) => {
     for (const node of nodes) {
-      if (node.type === 'generative') {
-        generative++;
-      } else if (node.type === 'group') {
-        group++;
-      } else {
-        // type === 'layer'
-        pixel++;
-      }
-      
-      if (node.children) {
-        traverse(node.children);
-      }
+      if (node.type === 'generative') generative++;
+      else if (node.type === 'group') group++;
+      else pixel++;
+      if (node.children) traverse(node.children);
     }
   };
-
   traverse(layers);
   return { pixel, group, generative, total: pixel + group + generative };
 };
 
 const RemapperInstanceRow = memo(({ 
-    instance, 
-    confirmations, 
-    toggleInstanceGeneration, 
-    handleConfirmGeneration, 
-    handleImageLoad, 
-    isGeneratingPreview, 
-    displayPreviews, 
-    payloadRegistry, 
-    id, 
-    localSetting 
+    instance, confirmations, toggleInstanceGeneration, handleConfirmGeneration, handleImageLoad, isGeneratingPreview, displayPreviews, payloadRegistry, id, localSetting 
 }: {
-    instance: InstanceData, 
-    confirmations: Record<number, string>, 
-    toggleInstanceGeneration: (idx: number) => void, 
-    handleConfirmGeneration: (idx: number, prompt: string, url?: string) => void, 
-    handleImageLoad: (idx: number) => void, 
-    isGeneratingPreview: Record<number, boolean>, 
-    displayPreviews: Record<number, string>, 
-    payloadRegistry: any, 
-    id: string, 
-    localSetting: boolean 
+    instance: InstanceData, confirmations: Record<number, string>, toggleInstanceGeneration: (idx: number) => void, handleConfirmGeneration: (idx: number, prompt: string, url?: string) => void, handleImageLoad: (idx: number) => void, isGeneratingPreview: Record<number, boolean>, displayPreviews: Record<number, string>, payloadRegistry: any, id: string, localSetting: boolean 
 }) => {
     const [isInspectorOpen, setInspectorOpen] = useState(false);
-
     const hasPreview = !!instance.payload?.previewUrl;
     const isAwaiting = instance.payload?.status === 'awaiting_confirmation';
     const currentPrompt = instance.source.aiStrategy?.generativePrompt;
     const confirmedPrompt = confirmations[instance.index];
     const refinementPending = !!confirmedPrompt && !!currentPrompt && confirmedPrompt !== currentPrompt;
-    
-    // LOGIC GATE CHECK for UI
     const effectiveAllowed = instance.payload?.generationAllowed ?? true;
-    
-    // Only show overlay if AI is allowed
     const showOverlay = effectiveAllowed && (hasPreview || isAwaiting || refinementPending);
-
-    // Fetch History directly from Store Payload (Source of Truth for Navigation)
     const storePayload = payloadRegistry[id]?.[`result-out-${instance.index}`];
     const persistedPreview = storePayload?.previewUrl;
     const storeIsSynthesizing = storePayload?.isSynthesizing;
     const storeConfirmed = storePayload?.isConfirmed;
-
     const effectivePreview = persistedPreview || displayPreviews[instance.index] || instance.payload?.previewUrl;
     const iterativeSource = storePayload?.sourceReference || instance.payload?.sourceReference;
-    
     const isEffectiveGenerating = !!isGeneratingPreview[instance.index] || !!storeIsSynthesizing;
-
     const hasOverrides = instance.source.aiStrategy?.overrides && instance.source.aiStrategy.overrides.length > 0;
-
-    // Process Breakdown Stats (Audit)
-    const audit = useMemo(() => {
-        if (!instance.payload?.layers) return null;
-        return getLayerAudit(instance.payload.layers);
-    }, [instance.payload?.layers]);
+    const audit = useMemo(() => instance.payload?.layers ? getLayerAudit(instance.payload.layers) : null, [instance.payload?.layers]);
 
     return (
         <div className="relative p-3 border-b border-slate-700/50 bg-slate-800 space-y-3 hover:bg-slate-700/20 transition-colors first:rounded-t-none">
-           
            <div className="flex flex-col space-y-3">
               <div className="relative flex items-center justify-between group">
                  <div className="flex flex-col w-full">
                      <div className="flex items-center justify-between mb-0.5">
                         <div className="flex items-center space-x-1.5">
                             <label className="text-[9px] uppercase text-slate-500 font-bold tracking-wider ml-1">Source Input</label>
-                            <button 
-                               onClick={(e) => { e.stopPropagation(); toggleInstanceGeneration(instance.index); }}
-                               className={`nodrag nopan p-0.5 rounded transition-colors ${localSetting ? 'text-purple-400 hover:text-purple-300 bg-purple-500/10' : 'text-slate-600 hover:text-slate-500'}`}
-                               title="Toggle Generative AI for this instance"
-                            >
+                            <button onClick={(e) => { e.stopPropagation(); toggleInstanceGeneration(instance.index); }} className={`nodrag nopan p-0.5 rounded transition-colors ${localSetting ? 'text-purple-400 hover:text-purple-300 bg-purple-500/10' : 'text-slate-600 hover:text-slate-500'}`} title="Toggle Generative AI for this instance">
                                 <Sparkles className="w-3 h-3" fill={localSetting ? "currentColor" : "none"} />
                             </button>
                         </div>
                         {instance.source.ready && <span className="text-[8px] text-blue-400 font-mono">LINKED</span>}
                      </div>
-                     
-                     <div className={`relative text-xs px-3 py-1.5 rounded border transition-colors ${
-                        instance.source.ready 
-                          ? 'bg-indigo-900/30 border-indigo-500/30 text-indigo-200 shadow-sm' 
-                          : 'bg-slate-900 border-slate-700 text-slate-500 italic'
-                      }`}>
-                        <Handle 
-                           type="target" 
-                           position={Position.Left} 
-                           id={`source-in-${instance.index}`} 
-                           className={`!absolute !-left-4 !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !border-2 !border-slate-900 z-50 transition-colors duration-200 ${
-                               instance.source.ready 
-                               ? '!bg-indigo-500 !border-white' 
-                               : '!bg-slate-700 !border-slate-500 group-hover:!bg-slate-600'
-                           }`} 
-                           title={`Source for Instance ${instance.index}`}
-                         />
+                     <div className={`relative text-xs px-3 py-1.5 rounded border transition-colors ${instance.source.ready ? 'bg-indigo-900/30 border-indigo-500/30 text-indigo-200 shadow-sm' : 'bg-slate-900 border-slate-700 text-slate-500 italic'}`}>
+                        <Handle type="target" position={Position.Left} id={`source-in-${instance.index}`} className={`!absolute !-left-4 !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !border-2 !border-slate-900 z-50 transition-colors duration-200 ${instance.source.ready ? '!bg-indigo-500 !border-white' : '!bg-slate-700 !border-slate-500 group-hover:!bg-slate-600'}`} title={`Source for Instance ${instance.index}`} />
                         {instance.source.ready ? instance.source.name : 'Connect Source...'}
                      </div>
                  </div>
               </div>
-
               <div className="relative flex items-center justify-between group">
                  <div className="flex flex-col w-full">
                      <div className="flex items-center justify-between mb-0.5">
                         <label className="text-[9px] uppercase text-slate-500 font-bold tracking-wider ml-1">Target Slot</label>
                         {instance.target.ready && <span className="text-[8px] text-emerald-400 font-mono">LINKED</span>}
                      </div>
-
-                     <div className={`relative text-xs px-3 py-1.5 rounded border transition-colors ${
-                        instance.target.ready 
-                          ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-300 shadow-sm' 
-                          : 'bg-slate-900 border-slate-700 text-slate-500 italic'
-                      }`}>
-                        <Handle 
-                           type="target" 
-                           position={Position.Left} 
-                           id={`target-in-${instance.index}`} 
-                           className={`!absolute !-left-4 !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !border-2 !border-slate-900 z-50 transition-colors duration-200 ${
-                               instance.target.ready 
-                               ? '!bg-emerald-500 !border-white' 
-                               : '!bg-slate-700 !border-slate-500 group-hover:!bg-slate-600'
-                           }`} 
-                           title={`Target for Instance ${instance.index}`}
-                         />
+                     <div className={`relative text-xs px-3 py-1.5 rounded border transition-colors ${instance.target.ready ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-300 shadow-sm' : 'bg-slate-900 border-slate-700 text-slate-500 italic'}`}>
+                        <Handle type="target" position={Position.Left} id={`target-in-${instance.index}`} className={`!absolute !-left-4 !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !border-2 !border-slate-900 z-50 transition-colors duration-200 ${instance.target.ready ? '!bg-emerald-500 !border-white' : '!bg-slate-700 !border-slate-500 group-hover:!bg-slate-600'}`} title={`Target for Instance ${instance.index}`} />
                         {instance.target.ready ? instance.target.name : 'Connect Target...'}
                      </div>
                  </div>
               </div>
            </div>
-
            <div className="relative mt-2 pt-3 border-t border-slate-700/50 flex flex-col space-y-2">
               {instance.payload ? (
                   <div className="flex flex-col w-full pr-4">
@@ -479,210 +351,77 @@ const RemapperInstanceRow = memo(({
                                   <div className="flex items-center gap-1">
                                       <span className="text-[8px] bg-pink-500/20 text-pink-300 px-1 rounded border border-pink-500/40">AI ENHANCED</span>
                                       {hasOverrides && (
-                                          <button 
-                                            onClick={(e) => { e.stopPropagation(); setInspectorOpen(!isInspectorOpen); }}
-                                            className={`p-0.5 rounded transition-colors ${isInspectorOpen ? 'text-pink-200 bg-pink-500/30' : 'text-slate-500 hover:text-pink-300'}`}
-                                            title="Toggle Override Inspector"
-                                          >
-                                              <Info className="w-3 h-3" />
-                                          </button>
+                                          <button onClick={(e) => { e.stopPropagation(); setInspectorOpen(!isInspectorOpen); }} className={`p-0.5 rounded transition-colors ${isInspectorOpen ? 'text-pink-200 bg-pink-500/30' : 'text-slate-500 hover:text-pink-300'}`} title="Toggle Override Inspector"><Info className="w-3 h-3" /></button>
                                       )}
                                   </div>
                               )}
-                              {instance.payload.requiresGeneration && effectiveAllowed && (
-                                  <span className="text-[8px] bg-purple-500/20 text-purple-300 px-1 rounded border border-purple-500/40">GEN</span>
-                              )}
-                              {!effectiveAllowed && (
-                                  <span className="text-[8px] bg-slate-700 text-slate-400 px-1 rounded border border-slate-600">AI MUTED</span>
-                              )}
+                              {instance.payload.requiresGeneration && effectiveAllowed && <span className="text-[8px] bg-purple-500/20 text-purple-300 px-1 rounded border border-purple-500/40">GEN</span>}
+                              {!effectiveAllowed && <span className="text-[8px] bg-slate-700 text-slate-400 px-1 rounded border border-slate-600">AI MUTED</span>}
                           </div>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                              {audit ? `${audit.total} Nodes • ` : ''}
-                              {instance.payload.scaleFactor.toFixed(2)}x Scale
-                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">{audit ? `${audit.total} Nodes • ` : ''}{instance.payload.scaleFactor.toFixed(2)}x Scale</span>
                       </div>
-                      
                       <div className={`w-full h-1 rounded overflow-hidden mt-1 ${instance.strategyUsed ? 'bg-pink-900' : 'bg-slate-900'}`}>
                          <div className={`h-full ${instance.strategyUsed ? 'bg-pink-500' : 'bg-emerald-500'}`} style={{ width: '100%' }}></div>
                       </div>
-
-                      {/* Detailed Process Audit Breakdown */}
                       {audit && (
                           <div className="flex flex-wrap gap-2 mt-2 select-none">
-                              {/* Pixel Layers */}
-                              <div className="px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-900/20 flex items-center space-x-1.5">
-                                  <Layers className="w-3 h-3 text-emerald-400" />
-                                  <span className="text-[9px] text-emerald-300 font-mono font-medium">
-                                      {audit.pixel} Pixel Layers
-                                  </span>
-                              </div>
-                              
-                              {/* Groups */}
-                              <div className="px-2 py-0.5 rounded border border-slate-600 bg-slate-700/40 flex items-center space-x-1.5">
-                                  <Box className="w-3 h-3 text-slate-400" />
-                                  <span className="text-[9px] text-slate-300 font-mono font-medium">
-                                      {audit.group} Groups
-                                  </span>
-                              </div>
-
-                              {/* AI Synthetic */}
-                              {audit.generative > 0 && (
-                                  <div className="px-2 py-0.5 rounded border border-purple-500/30 bg-purple-900/20 flex items-center space-x-1.5">
-                                      <Cpu className="w-3 h-3 text-purple-400" />
-                                      <span className="text-[9px] text-purple-300 font-mono font-medium">
-                                          {audit.generative} AI Synthetic
-                                      </span>
-                                  </div>
-                              )}
+                              <div className="px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-900/20 flex items-center space-x-1.5"><Layers className="w-3 h-3 text-emerald-400" /><span className="text-[9px] text-emerald-300 font-mono font-medium">{audit.pixel} Pixel Layers</span></div>
+                              <div className="px-2 py-0.5 rounded border border-slate-600 bg-slate-700/40 flex items-center space-x-1.5"><Box className="w-3 h-3 text-slate-400" /><span className="text-[9px] text-slate-300 font-mono font-medium">{audit.group} Groups</span></div>
+                              {audit.generative > 0 && <div className="px-2 py-0.5 rounded border border-purple-500/30 bg-purple-900/20 flex items-center space-x-1.5"><Cpu className="w-3 h-3 text-purple-400" /><span className="text-[9px] text-purple-300 font-mono font-medium">{audit.generative} AI Synthetic</span></div>}
                           </div>
                       )}
-                      
-                      {/* Override Inspector */}
                       {isInspectorOpen && instance.source.layers && instance.source.originalBounds && instance.target.bounds && instance.source.aiStrategy && (
-                          <OverrideInspector 
-                              sourceLayers={instance.source.layers}
-                              sourceBounds={instance.source.originalBounds}
-                              targetBounds={instance.target.bounds}
-                              strategy={instance.source.aiStrategy}
-                          />
+                          <OverrideInspector sourceLayers={instance.source.layers} sourceBounds={instance.source.originalBounds} targetBounds={instance.target.bounds} strategy={instance.source.aiStrategy} />
                       )}
-                      
                       {showOverlay && (
                           <div className="mt-2 p-2 bg-slate-900/50 border border-slate-700 rounded flex flex-col space-y-2">
-                              {isAwaiting && (
-                                   <span className="text-[9px] text-yellow-200 font-medium leading-tight">
-                                       ⚠️ High procedural distortion.
-                                   </span>
-                              )}
-                              {refinementPending && (
-                                  <div className="flex items-center space-x-1.5 p-1.5 bg-indigo-900/40 border border-indigo-500/30 rounded mb-1 animate-pulse">
-                                      <svg className="w-3 h-3 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                                      <span className="text-[9px] text-indigo-200 font-medium leading-none">Refinement detected. Re-confirm to apply.</span>
-                                  </div>
-                              )}
-                              
-                              <GenerativePreviewOverlay 
-                                  previewUrl={effectivePreview}
-                                  canonicalUrl={persistedPreview}
-                                  isGenerating={isEffectiveGenerating}
-                                  scale={instance.payload.scaleFactor}
-                                  onConfirm={(url) => handleConfirmGeneration(instance.index, instance.source.aiStrategy?.generativePrompt || '', url)}
-                                  isStoreConfirmed={!!storeConfirmed}
-                                  targetDimensions={instance.source.targetDimensions || instance.target.bounds}
-                                  sourceReference={iterativeSource}
-                                  onImageLoad={() => handleImageLoad(instance.index)}
-                                  generationId={storePayload?.generationId}
-                              />
+                              {isAwaiting && <span className="text-[9px] text-yellow-200 font-medium leading-tight">⚠️ High procedural distortion.</span>}
+                              {refinementPending && <div className="flex items-center space-x-1.5 p-1.5 bg-indigo-900/40 border border-indigo-500/30 rounded mb-1 animate-pulse"><svg className="w-3 h-3 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg><span className="text-[9px] text-indigo-200 font-medium leading-none">Refinement detected. Re-confirm to apply.</span></div>}
+                              <GenerativePreviewOverlay previewUrl={effectivePreview} canonicalUrl={persistedPreview} isGenerating={isEffectiveGenerating} scale={instance.payload.scaleFactor} onConfirm={(url) => handleConfirmGeneration(instance.index, instance.source.aiStrategy?.generativePrompt || '', url)} isStoreConfirmed={!!storeConfirmed} targetDimensions={instance.source.targetDimensions || instance.target.bounds} sourceReference={iterativeSource} onImageLoad={() => handleImageLoad(instance.index)} generationId={storePayload?.generationId} />
                           </div>
                       )}
                   </div>
               ) : (
-                  <div className="flex items-center space-x-2 opacity-50">
-                      <svg className="w-3 h-3 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                      <span className="text-[10px] text-slate-500 italic">Waiting for connection...</span>
-                  </div>
+                  <div className="flex items-center space-x-2 opacity-50"><svg className="w-3 h-3 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span className="text-[10px] text-slate-500 italic">Waiting for connection...</span></div>
               )}
-              
-              <Handle 
-                 type="source" 
-                 position={Position.Right} 
-                 id={`result-out-${instance.index}`} 
-                 className={`!absolute !-right-1.5 !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !border-2 !border-slate-900 z-50 transition-colors duration-300 ${
-                     instance.payload && instance.payload.status !== 'error' 
-                     ? '!bg-emerald-500 !border-white' 
-                     : '!bg-slate-700 !border-slate-500'
-                 }`} 
-                 title={`Output Payload ${instance.index}`} 
-              />
+              <Handle type="source" position={Position.Right} id={`result-out-${instance.index}`} className={`!absolute !-right-1.5 !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !border-2 !border-slate-900 z-50 transition-colors duration-300 ${instance.payload && instance.payload.status !== 'error' ? '!bg-emerald-500 !border-white' : '!bg-slate-700 !border-slate-500'}`} title={`Output Payload ${instance.index}`} />
            </div>
         </div>
     );
 });
 
-// ... RemapperNode component (mostly same logic, just imports updated) ...
-
 export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
-    // ... standard hooks ...
     const instanceCount = data.instanceCount || 1;
     const instanceSettings = data.instanceSettings || {};
-
     const [confirmations, setConfirmations] = useState<Record<number, string>>({});
-    
-    // Loading state only. Data state lives in PayloadRegistry.
     const [isGeneratingPreview, setIsGeneratingPreview] = useState<Record<number, boolean>>({});
     const lastPromptsRef = useRef<Record<number, string>>({});
     const previousBlobsRef = useRef<Record<number, string>>({});
     const [displayPreviews, setDisplayPreviews] = useState<Record<number, string>>({});
     const isTransitioningRef = useRef<Record<number, boolean>>({});
-
     const { setNodes } = useReactFlow();
     const updateNodeInternals = useUpdateNodeInternals();
     const edges = useEdges();
     const nodes = useNodes();
-    
-    // Consume data from Store
     const { templateRegistry, resolvedRegistry, payloadRegistry, registerPayload, updatePayload, unregisterNode } = useProceduralStore();
-
-    // GLOBAL GATE: Master Switch from Node Data
     const globalGenerationAllowed = (data as any).remapperConfig?.generationAllowed ?? true;
 
-    // ... standard effects ...
-    useEffect(() => {
-        return () => unregisterNode(id);
-    }, [id, unregisterNode]);
-
-    useEffect(() => {
-        updateNodeInternals(id);
-    }, [id, instanceCount, updateNodeInternals]);
-
+    useEffect(() => { return () => unregisterNode(id); }, [id, unregisterNode]);
+    useEffect(() => { updateNodeInternals(id); }, [id, instanceCount, updateNodeInternals]);
     useEffect(() => {
         const blobs = previousBlobsRef.current;
-        return () => {
-            Object.values(blobs).forEach((url) => {
-                if (typeof url === 'string' && url.startsWith('blob:')) {
-                    URL.revokeObjectURL(url);
-                }
-            });
-        };
+        return () => { Object.values(blobs).forEach((url) => { if (typeof url === 'string' && url.startsWith('blob:')) URL.revokeObjectURL(url); }); };
     }, []);
+    useEffect(() => { if (!globalGenerationAllowed) { setConfirmations({}); setDisplayPreviews({}); setIsGeneratingPreview({}); } }, [globalGenerationAllowed]);
 
-    useEffect(() => {
-        if (!globalGenerationAllowed) {
-            setConfirmations({});
-            setDisplayPreviews({});
-            setIsGeneratingPreview({});
-        }
-    }, [globalGenerationAllowed]);
-
-    // ... Toggle actions ...
     const toggleMasterGeneration = useCallback(() => {
         setNodes((nds) => nds.map((n) => {
             if (n.id === id) {
                 const currentConfig = n.data.remapperConfig || { targetContainerName: null };
-                const currentGlobal = currentConfig.generationAllowed ?? true;
-                const newGlobal = !currentGlobal;
-                
-                const count = n.data.instanceCount || 1;
+                const newGlobal = !(currentConfig.generationAllowed ?? true);
                 const newInstanceSettings = { ...(n.data.instanceSettings || {}) };
-                
-                for (let i = 0; i < count; i++) {
-                    newInstanceSettings[i] = {
-                        ...(newInstanceSettings[i] || {}),
-                        generationAllowed: newGlobal
-                    };
-                }
-
-                return {
-                    ...n,
-                    data: {
-                        ...n.data,
-                        remapperConfig: {
-                            ...currentConfig,
-                            generationAllowed: newGlobal
-                        },
-                        instanceSettings: newInstanceSettings
-                    }
-                };
+                for (let i = 0; i < (n.data.instanceCount || 1); i++) { newInstanceSettings[i] = { ...(newInstanceSettings[i] || {}), generationAllowed: newGlobal }; }
+                return { ...n, data: { ...n.data, remapperConfig: { ...currentConfig, generationAllowed: newGlobal }, instanceSettings: newInstanceSettings } };
             }
             return n;
         }));
@@ -692,22 +431,8 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
         setNodes((nds) => nds.map((n) => {
             if (n.id === id) {
                 const currentSettings = n.data.instanceSettings || {};
-                const currentInstanceSetting = currentSettings[index] || {};
-                const newAllowed = !(currentInstanceSetting.generationAllowed ?? true);
-
-                return {
-                    ...n,
-                    data: {
-                        ...n.data,
-                        instanceSettings: {
-                            ...currentSettings,
-                            [index]: {
-                                ...currentInstanceSetting,
-                                generationAllowed: newAllowed
-                            }
-                        }
-                    }
-                };
+                const newAllowed = !(currentSettings[index]?.generationAllowed ?? true);
+                return { ...n, data: { ...n.data, instanceSettings: { ...currentSettings, [index]: { ...currentSettings[index], generationAllowed: newAllowed } } } };
             }
             return n;
         }));
@@ -716,20 +441,11 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
     const handleConfirmGeneration = useCallback((index: number, prompt: string, confirmedUrl?: string) => {
         if (!confirmedUrl) return;
         setConfirmations(prev => ({ ...prev, [index]: prompt }));
-        updatePayload(id, `result-out-${index}`, {
-            previewUrl: confirmedUrl,
-            isConfirmed: true,
-            isTransient: false,
-            sourceReference: confirmedUrl,
-            generationId: Date.now()
-        });
+        updatePayload(id, `result-out-${index}`, { previewUrl: confirmedUrl, isConfirmed: true, isTransient: false, sourceReference: confirmedUrl, generationId: Date.now() });
     }, [id, updatePayload]);
 
-    const handleImageLoad = useCallback((index: number) => {
-        isTransitioningRef.current[index] = false;
-    }, []);
+    const handleImageLoad = useCallback((index: number) => { isTransitioningRef.current[index] = false; }, []);
 
-    // ... Memoized Computation Logic ...
     const instances: InstanceData[] = useMemo(() => {
         const result: InstanceData[] = [];
         const loadPsdNode = nodes.find(n => n.type === 'loadPsd');
@@ -737,87 +453,63 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
         for (let i = 0; i < instanceCount; i++) {
             const sourceHandleId = `source-in-${i}`;
             const targetHandleId = `target-in-${i}`;
+            const effectiveAllowed = globalGenerationAllowed && (instanceSettings[i]?.generationAllowed ?? true);
 
-            const localSettings = instanceSettings[i];
-            const localAllowed = localSettings?.generationAllowed ?? true;
-            const effectiveAllowed = globalGenerationAllowed && localAllowed;
-
-            // 1. Resolve Source
             let sourceData: any = { ready: false };
             const sourceEdge = edges.find(e => e.target === id && e.targetHandle === sourceHandleId);
-            
             if (sourceEdge && sourceEdge.sourceHandle) {
                 const resolvedData = resolvedRegistry[sourceEdge.source];
                 if (resolvedData) {
                     const context = resolvedData[sourceEdge.sourceHandle];
                     if (context) {
-                        const binarySourceId = loadPsdNode ? loadPsdNode.id : sourceEdge.source;
-                        sourceData = {
-                            ready: true,
-                            name: context.container.containerName,
-                            nodeId: binarySourceId,
-                            sourceNodeId: sourceEdge.source,
-                            handleId: sourceEdge.sourceHandle,
-                            layers: context.layers,
-                            originalBounds: context.container.bounds,
-                            aiStrategy: context.aiStrategy,
-                            previewUrl: context.previewUrl,
-                            targetDimensions: context.targetDimensions
-                        };
+                        sourceData = { ready: true, name: context.container.containerName, nodeId: loadPsdNode ? loadPsdNode.id : sourceEdge.source, sourceNodeId: sourceEdge.source, handleId: sourceEdge.sourceHandle, layers: context.layers, originalBounds: context.container.bounds, aiStrategy: context.aiStrategy, previewUrl: context.previewUrl, targetDimensions: context.targetDimensions };
                     }
                 }
             }
 
-            // 2. Resolve Target
             let targetData: any = { ready: false };
             const targetEdge = edges.find(e => e.target === id && e.targetHandle === targetHandleId);
-
             if (targetEdge && targetEdge.sourceHandle) {
                 const template = templateRegistry[targetEdge.source];
                 if (template) {
-                    const handle = targetEdge.sourceHandle;
-                    let containerDefinition;
-                    containerDefinition = template.containers.find(c => c.name === handle);
-                    if (!containerDefinition && handle.startsWith('slot-bounds-')) {
-                        const clean = handle.replace('slot-bounds-', '');
-                        containerDefinition = template.containers.find(c => c.name === clean);
-                    }
-                    if (!containerDefinition) {
-                        const indexMatch = handle.match(/^target-out-(\d+)$/);
-                        if (indexMatch && template.containers[parseInt(indexMatch[1], 10)]) {
-                            containerDefinition = template.containers[parseInt(indexMatch[1], 10)];
-                        }
-                    }
-                    if (!containerDefinition && template.containers.length === 1) {
-                        containerDefinition = template.containers[0];
-                    }
-
-                    if (containerDefinition) {
-                        targetData = {
-                            ready: true,
-                            name: containerDefinition.originalName || containerDefinition.name,
-                            bounds: containerDefinition.bounds
-                        };
-                    }
+                    let containerDefinition = template.containers.find(c => c.name === targetEdge.sourceHandle);
+                    if (!containerDefinition && targetEdge.sourceHandle.startsWith('slot-bounds-')) containerDefinition = template.containers.find(c => c.name === targetEdge.sourceHandle.replace('slot-bounds-', ''));
+                    if (!containerDefinition) { const indexMatch = targetEdge.sourceHandle.match(/^target-out-(\d+)$/); if (indexMatch) containerDefinition = template.containers[parseInt(indexMatch[1], 10)]; }
+                    if (!containerDefinition && template.containers.length === 1) containerDefinition = template.containers[0];
+                    if (containerDefinition) targetData = { ready: true, name: containerDefinition.originalName || containerDefinition.name, bounds: containerDefinition.bounds };
                 }
             }
 
-            // 3. Compute Payload
             let payload: TransformedPayload | null = null;
             let strategyUsed = false;
 
             if (sourceData.ready && targetData.ready) {
                 const sourceRect = sourceData.originalBounds;
                 const targetRect = targetData.bounds;
-                
-                const ratioX = targetRect.w / sourceRect.w;
-                const ratioY = targetRect.h / sourceRect.h;
-                let scale = Math.min(ratioX, ratioY);
-                let anchorX = targetRect.x;
-                let anchorY = targetRect.y;
-
                 const strategy = sourceData.aiStrategy;
                 
+                // PHASE 4B: Structural Bundling Check
+                const isZeroGap = strategy?.directives?.includes('ZERO_GAP_ALIGNMENT');
+                let masterOverride: LayerOverride | undefined;
+
+                // Identify Master Layer Override if bundling is active
+                if (isZeroGap && strategy?.overrides) {
+                    const findMaster = (layers: SerializableLayer[]): SerializableLayer | undefined => {
+                        for(const l of layers) {
+                            if (l.name.match(/BG|Background|Back/i)) return l;
+                            if (l.children) { const res = findMaster(l.children); if(res) return res; }
+                        }
+                    };
+                    const masterLayer = findMaster(sourceData.layers || []);
+                    if (masterLayer) {
+                        masterOverride = strategy.overrides.find(o => o.layerId === masterLayer.id);
+                    }
+                }
+
+                let scale = Math.min(targetRect.w / sourceRect.w, targetRect.h / sourceRect.h);
+                let anchorX = targetRect.x + (targetRect.w - (sourceRect.w * scale)) / 2;
+                let anchorY = targetRect.y + (targetRect.h - (sourceRect.h * scale)) / 2;
+
                 if (strategy) {
                     scale = strategy.suggestedScale;
                     strategyUsed = true;
@@ -827,74 +519,72 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                     if (strategy.anchor === 'TOP') anchorY = targetRect.y;
                     else if (strategy.anchor === 'BOTTOM') anchorY = targetRect.y + (targetRect.h - scaledH);
                     else anchorY = targetRect.y + (targetRect.h - scaledH) / 2;
-                } else {
-                    const scaledW = sourceRect.w * scale;
-                    const scaledH = sourceRect.h * scale;
-                    anchorX = targetRect.x + (targetRect.w - scaledW) / 2;
-                    anchorY = targetRect.y + (targetRect.h - scaledH) / 2;
                 }
 
                 const transformLayers = (layers: SerializableLayer[], parentDeltaX = 0, parentDeltaY = 0): TransformedLayer[] => {
-                return layers.map(layer => {
-                    const relX = (layer.coords.x - sourceRect.x) / sourceRect.w;
-                    const relY = (layer.coords.y - sourceRect.y) / sourceRect.h;
-                    const geomX = anchorX + (relX * (sourceRect.w * scale));
-                    const geomY = anchorY + (relY * (sourceRect.h * scale));
-                    let finalX = geomX + parentDeltaX;
-                    let finalY = geomY + parentDeltaY;
-                    let layerScaleX = scale;
-                    let layerScaleY = scale;
-                    const override = strategy?.overrides?.find(o => o.layerId === layer.id);
-                    
-                    if (override) {
-                    finalX = targetRect.x + override.xOffset;
-                    finalY = targetRect.y + override.yOffset;
-                    layerScaleX *= override.individualScale;
-                    layerScaleY *= override.individualScale;
-                    }
+                    return layers.map(layer => {
+                        const relX = (layer.coords.x - sourceRect.x) / sourceRect.w;
+                        const relY = (layer.coords.y - sourceRect.y) / sourceRect.h;
+                        const geomX = anchorX + (relX * (sourceRect.w * scale));
+                        const geomY = anchorY + (relY * (sourceRect.h * scale));
+                        let finalX = geomX + parentDeltaX;
+                        let finalY = geomY + parentDeltaY;
+                        let layerScaleX = scale;
+                        let layerScaleY = scale;
+                        
+                        let override = strategy?.overrides?.find(o => o.layerId === layer.id);
 
-                    const bleedY = targetRect.h * MAX_BOUNDARY_VIOLATION_PERCENT;
-                    const minY = targetRect.y - bleedY;
-                    const maxY = targetRect.y + targetRect.h + bleedY;
-                    finalY = Math.max(minY, Math.min(finalY, maxY));
-                    const newW = layer.coords.w * layerScaleX;
-                    const newH = layer.coords.h * layerScaleY;
+                        // STRUCTURAL BUNDLING LOGIC
+                        // If Zero Gap is enforced and this layer matches 'Slave' criteria, force inherit Master attributes
+                        if (isZeroGap && masterOverride && layer.name.match(/Frame|Divider|Border|Grid/i)) {
+                            // Replace individual override with Master's geometry to ensure lock-step
+                            override = { ...masterOverride, layerId: layer.id }; 
+                        }
 
-                    return {
-                    ...layer,
-                    coords: { x: finalX, y: finalY, w: newW, h: newH },
-                    transform: { scaleX: layerScaleX, scaleY: layerScaleY, offsetX: finalX, offsetY: finalY },
-                    children: layer.children ? transformLayers(layer.children, parentDeltaX, parentDeltaY) : undefined
-                    };
-                });
+                        if (override) {
+                            finalX = targetRect.x + override.xOffset;
+                            finalY = targetRect.y + override.yOffset;
+                            layerScaleX *= override.individualScale;
+                            layerScaleY *= override.individualScale;
+                        }
+
+                        const bleedY = targetRect.h * MAX_BOUNDARY_VIOLATION_PERCENT;
+                        finalY = Math.max(targetRect.y - bleedY, Math.min(finalY, targetRect.y + targetRect.h + bleedY));
+                        
+                        return {
+                            ...layer,
+                            coords: { x: finalX, y: finalY, w: layer.coords.w * layerScaleX, h: layer.coords.h * layerScaleY },
+                            transform: { scaleX: layerScaleX, scaleY: layerScaleY, offsetX: finalX, offsetY: finalY },
+                            children: layer.children ? transformLayers(layer.children, parentDeltaX, parentDeltaY) : undefined
+                        };
+                    });
                 };
 
                 const transformedLayers = transformLayers(sourceData.layers as SerializableLayer[]);
-
+                
                 let requiresGeneration = false;
                 let status: TransformedPayload['status'] = 'success';
                 let generativePromptUsed = null;
+                const currentPrompt = strategy?.generativePrompt;
                 
-                const currentPrompt = sourceData.aiStrategy?.generativePrompt;
+                // MANDATORY AUTO-CONFIRM CHECK (Client-side view prediction)
+                const isMandatory = strategy?.isExplicitIntent || strategy?.directives?.includes('MANDATORY_GEN_FILL');
                 const confirmedPrompt = confirmations[i];
-                const isConfirmed = !!currentPrompt && currentPrompt === confirmedPrompt;
+                // If mandatory, we treat it as implicitly confirmed for the purpose of generation init
+                const isConfirmed = isMandatory || (!!currentPrompt && currentPrompt === confirmedPrompt);
 
                 if (currentPrompt) {
-                    const scaleThreshold = 2.0;
-                    const isExplicit = sourceData.aiStrategy!.isExplicitIntent;
-                    const isHighStretch = scale > scaleThreshold;
-                    
                     if (isConfirmed) {
                         requiresGeneration = true;
                         generativePromptUsed = currentPrompt;
                         status = 'success';
-                    } else if (isExplicit || isHighStretch) {
+                    } else if (strategy?.isExplicitIntent || scale > 2.0) {
                         status = 'awaiting_confirmation';
                     }
                 }
 
                 if (requiresGeneration && generativePromptUsed) {
-                    const genLayer: TransformedLayer = {
+                    transformedLayers.unshift({
                         id: `gen-layer-${sourceData.name || 'unknown'}`,
                         name: `✨ AI Gen: ${generativePromptUsed.substring(0, 20)}...`,
                         type: 'generative',
@@ -903,46 +593,36 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                         coords: { x: targetRect.x, y: targetRect.y, w: targetRect.w, h: targetRect.h },
                         transform: { scaleX: 1, scaleY: 1, offsetX: targetRect.x, offsetY: targetRect.y },
                         generativePrompt: generativePromptUsed
-                    };
-                    transformedLayers.unshift(genLayer);
+                    });
                 }
                 
                 const storePayload = payloadRegistry[id]?.[`result-out-${i}`];
-
                 payload = {
-                    status: status,
+                    status,
                     sourceNodeId: sourceData.nodeId,
                     sourceContainer: sourceData.name,
                     targetContainer: targetData.name,
                     layers: transformedLayers,
                     scaleFactor: scale,
                     metrics: { source: { w: sourceRect.w, h: sourceRect.h }, target: { w: targetRect.w, h: targetRect.h } },
-                    // NEW: Populate Target Bounds with full origin for coordinate normalization
                     targetBounds: { x: targetRect.x, y: targetRect.y, w: targetRect.w, h: targetRect.h },
-                    requiresGeneration: requiresGeneration,
+                    requiresGeneration,
                     previewUrl: storePayload?.previewUrl || sourceData.previewUrl,
-                    isConfirmed: isConfirmed,
-                    isTransient: !isConfirmed, 
-                    sourceReference: sourceData.aiStrategy?.sourceReference,
+                    isConfirmed,
+                    isTransient: !isConfirmed,
+                    sourceReference: strategy?.sourceReference,
                     generationId: storePayload?.generationId,
                     isSynthesizing: storePayload?.isSynthesizing,
-                    generationAllowed: effectiveAllowed 
+                    generationAllowed: effectiveAllowed,
+                    directives: strategy?.directives, // Propagate Directives
+                    isMandatory: isMandatory // Propagate Mandatory Flag
                 };
             }
-
-            result.push({
-                index: i,
-                source: sourceData,
-                target: targetData,
-                payload,
-                strategyUsed
-            });
+            result.push({ index: i, source: sourceData, target: targetData, payload, strategyUsed });
         }
-
         return result;
     }, [instanceCount, edges, id, resolvedRegistry, templateRegistry, nodes, confirmations, payloadRegistry, globalGenerationAllowed, instanceSettings]);
 
-    // ... Effects and Render (same as before) ...
     useEffect(() => {
         instances.forEach(instance => {
             if (instance.payload && !isGeneratingPreview[instance.index]) {
@@ -956,25 +636,15 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
             const idx = instance.index;
             const storePayload = payloadRegistry[id]?.[`result-out-${idx}`];
             const incomingUrl = storePayload?.previewUrl || instance.payload?.previewUrl;
-            
             const currentUrl = displayPreviews[idx];
-            const isLocked = isTransitioningRef.current[idx];
-
             if (incomingUrl) {
-                if (incomingUrl !== currentUrl) {
-                    if (isLocked) return;
+                if (incomingUrl !== currentUrl && !isTransitioningRef.current[idx]) {
                     isTransitioningRef.current[idx] = true;
                     setDisplayPreviews(prev => ({ ...prev, [idx]: incomingUrl }));
-                    setTimeout(() => {
-                        if (isTransitioningRef.current[idx]) isTransitioningRef.current[idx] = false;
-                    }, 800);
+                    setTimeout(() => isTransitioningRef.current[idx] = false, 800);
                 }
             } else if (currentUrl) {
-                setDisplayPreviews(prev => {
-                    const next = { ...prev };
-                    delete next[idx];
-                    return next;
-                });
+                setDisplayPreviews(prev => { const next = { ...prev }; delete next[idx]; return next; });
                 isTransitioningRef.current[idx] = false;
             }
         });
@@ -983,165 +653,69 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
     useEffect(() => {
         instances.forEach(instance => {
             const idx = instance.index;
-            
             if (!instance.payload?.generationAllowed) {
-                if (isGeneratingPreview[idx]) {
-                    setIsGeneratingPreview(prev => ({...prev, [idx]: false}));
-                }
+                if (isGeneratingPreview[idx]) setIsGeneratingPreview(prev => ({...prev, [idx]: false}));
                 return;
             }
-
             const strategy = instance.source.aiStrategy;
             const currentPrompt = strategy?.generativePrompt;
-            
             const lastPrompt = lastPromptsRef.current[idx];
             const hasPrompt = !!currentPrompt;
             const promptChanged = hasPrompt && currentPrompt !== lastPrompt;
-            
             const isAwaiting = instance.payload?.status === 'awaiting_confirmation';
             const storePayload = payloadRegistry[id]?.[`result-out-${idx}`];
             const hasPreview = !!(storePayload?.previewUrl);
-            const needsInitialPreview = isAwaiting && hasPrompt && !hasPreview;
+            
+            // Check implicit mandatory confirmation
+            const isMandatory = instance.payload?.isMandatory || strategy?.directives?.includes('MANDATORY_GEN_FILL');
+            const needsInitialPreview = (isAwaiting || isMandatory) && hasPrompt && !hasPreview;
 
-            if (strategy?.method === 'GEOMETRIC') {
-                if (hasPreview || storePayload?.isConfirmed) {
-                    updatePayload(id, `result-out-${idx}`, { previewUrl: undefined, isConfirmed: false, isTransient: false });
-                }
+            if (strategy?.method === 'GEOMETRIC' && !isMandatory) {
+                if (hasPreview || storePayload?.isConfirmed) updatePayload(id, `result-out-${idx}`, { previewUrl: undefined, isConfirmed: false, isTransient: false });
                 return;
-            }
-
-            const lockedPrompt = confirmations[idx];
-            const isRefinementDetected = !!currentPrompt && !!lockedPrompt && currentPrompt !== lockedPrompt;
-
-            if (isRefinementDetected && storePayload?.isConfirmed) {
-                console.log(`[Remapper] Refinement detected for #${idx}. Revoking confirmation.`);
-                updatePayload(id, `result-out-${idx}`, { isConfirmed: false });
             }
 
             if (promptChanged || needsInitialPreview) {
                 if (isGeneratingPreview[idx] && !promptChanged) return;
                 if (currentPrompt) lastPromptsRef.current[idx] = currentPrompt;
-
                 const prompt = currentPrompt!;
-                const sourceRef = instance.source.aiStrategy?.sourceReference || storePayload?.sourceReference;
+                const sourceRef = strategy?.sourceReference || storePayload?.sourceReference;
                 
                 const generateDraft = async () => {
                     setIsGeneratingPreview(prev => ({...prev, [idx]: true}));
                     updatePayload(id, `result-out-${idx}`, { isSynthesizing: true });
-
                     try {
                         const apiKey = process.env.API_KEY;
                         if (!apiKey) return;
                         const ai = new GoogleGenAI({ apiKey });
                         const parts: any[] = [];
-                        
-                        if (sourceRef) {
-                            const base64Data = sourceRef.includes('base64,') ? sourceRef.split('base64,')[1] : sourceRef;
-                            parts.push({ inlineData: { mimeType: 'image/png', data: base64Data } });
-                        }
+                        if (sourceRef) parts.push({ inlineData: { mimeType: 'image/png', data: sourceRef.includes('base64,') ? sourceRef.split('base64,')[1] : sourceRef } });
                         parts.push({ text: prompt });
-
-                        const response = await ai.models.generateContent({
-                            model: 'gemini-2.5-flash-image',
-                            contents: { parts },
-                            config: { imageConfig: { aspectRatio: "1:1" } }
-                        });
-                        
+                        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash-image', contents: { parts }, config: { imageConfig: { aspectRatio: "1:1" } } });
                         let base64Data = null;
-                        for (const part of response.candidates?.[0]?.content?.parts || []) {
-                            if (part.inlineData) {
-                                base64Data = part.inlineData.data;
-                                break;
-                            }
-                        }
-                        
+                        for (const part of response.candidates?.[0]?.content?.parts || []) { if (part.inlineData) { base64Data = part.inlineData.data; break; } }
                         if (base64Data) {
                             const url = `data:image/png;base64,${base64Data}`;
-                            
                             const previousUrl = previousBlobsRef.current[idx];
-                            if (previousUrl && previousUrl !== url && previousUrl.startsWith('blob:')) {
-                                setTimeout(() => URL.revokeObjectURL(previousUrl), 2000);
-                            }
+                            if (previousUrl && previousUrl !== url && previousUrl.startsWith('blob:')) setTimeout(() => URL.revokeObjectURL(previousUrl), 2000);
                             previousBlobsRef.current[idx] = url;
-
-                            updatePayload(id, `result-out-${idx}`, {
-                                previewUrl: url,
-                                isTransient: true,
-                                isSynthesizing: false,
-                                generationId: Date.now()
-                            });
+                            updatePayload(id, `result-out-${idx}`, { previewUrl: url, isTransient: true, isSynthesizing: false, generationId: Date.now() });
                         }
-
-                    } catch (e) {
-                        console.error("Draft Generation Failed", e);
-                        updatePayload(id, `result-out-${idx}`, { isSynthesizing: false });
-                    } finally {
-                        setIsGeneratingPreview(prev => ({...prev, [idx]: false}));
-                    }
+                    } catch (e) { console.error("Draft Generation Failed", e); updatePayload(id, `result-out-${idx}`, { isSynthesizing: false }); } finally { setIsGeneratingPreview(prev => ({...prev, [idx]: false})); }
                 };
                 generateDraft();
             }
         });
-    }, [instances, isGeneratingPreview, id, updatePayload, payloadRegistry, confirmations]);
-
-    const addInstance = useCallback(() => {
-        setNodes((nds) => nds.map((node) => {
-            if (node.id === id) {
-            return { ...node, data: { ...node.data, instanceCount: (node.data.instanceCount || 1) + 1 } };
-            }
-            return node;
-        }));
-    }, [id, setNodes]);
+    }, [instances, isGeneratingPreview, id, updatePayload, payloadRegistry]);
 
     return (
         <div className="w-[500px] bg-slate-800 rounded-lg shadow-xl border border-indigo-500/50 font-sans relative flex flex-col">
         <div className="bg-indigo-900/80 p-2 border-b border-indigo-800 flex items-center justify-between shrink-0 rounded-t-lg">
-            <div className="flex items-center space-x-2">
-            <svg className="w-4 h-4 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-            </svg>
-            <span className="text-sm font-semibold text-indigo-100">Procedural Remapper</span>
-            </div>
-            <div className="flex items-center space-x-2">
-                <button 
-                    onClick={(e) => { e.stopPropagation(); toggleMasterGeneration(); }}
-                    className={`nodrag nopan p-1 rounded transition-colors ${globalGenerationAllowed ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/40' : 'bg-slate-700/50 text-slate-500 hover:bg-slate-700'}`}
-                    title={globalGenerationAllowed ? "Master Gate: AI Enabled" : "Master Gate: AI Disabled"}
-                >
-                    <Sparkles className="w-3.5 h-3.5" fill={globalGenerationAllowed ? "currentColor" : "none"} />
-                </button>
-                <span className="text-[10px] text-indigo-400/70 font-mono">TRANSFORMER</span>
-            </div>
+            <div className="flex items-center space-x-2"><svg className="w-4 h-4 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg><span className="text-sm font-semibold text-indigo-100">Procedural Remapper</span></div>
+            <div className="flex items-center space-x-2"><button onClick={(e) => { e.stopPropagation(); toggleMasterGeneration(); }} className={`nodrag nopan p-1 rounded transition-colors ${globalGenerationAllowed ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/40' : 'bg-slate-700/50 text-slate-500 hover:bg-slate-700'}`} title={globalGenerationAllowed ? "Master Gate: AI Enabled" : "Master Gate: AI Disabled"}><Sparkles className="w-3.5 h-3.5" fill={globalGenerationAllowed ? "currentColor" : "none"} /></button><span className="text-[10px] text-indigo-400/70 font-mono">TRANSFORMER</span></div>
         </div>
-
-        <div className="flex flex-col">
-            {instances.map((instance) => (
-                <RemapperInstanceRow 
-                    key={instance.index}
-                    instance={instance}
-                    confirmations={confirmations}
-                    toggleInstanceGeneration={toggleInstanceGeneration}
-                    handleConfirmGeneration={handleConfirmGeneration}
-                    handleImageLoad={handleImageLoad}
-                    isGeneratingPreview={isGeneratingPreview}
-                    displayPreviews={displayPreviews}
-                    payloadRegistry={payloadRegistry}
-                    id={id}
-                    localSetting={instanceSettings[instance.index]?.generationAllowed ?? true}
-                />
-            ))}
-        </div>
-
-        <button 
-            onClick={addInstance}
-            className="w-full py-2 bg-slate-800 hover:bg-slate-700 border-t border-slate-700 text-slate-400 hover:text-slate-200 transition-colors flex items-center justify-center space-x-1 rounded-b-lg"
-        >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <span className="text-[10px] font-medium uppercase tracking-wider">Add Remap Instance</span>
-        </button>
-
+        <div className="flex flex-col">{instances.map((instance) => (<RemapperInstanceRow key={instance.index} instance={instance} confirmations={confirmations} toggleInstanceGeneration={toggleInstanceGeneration} handleConfirmGeneration={handleConfirmGeneration} handleImageLoad={handleImageLoad} isGeneratingPreview={isGeneratingPreview} displayPreviews={displayPreviews} payloadRegistry={payloadRegistry} id={id} localSetting={instanceSettings[instance.index]?.generationAllowed ?? true} />))}</div>
+        <button onClick={() => setNodes(nds => nds.map(n => n.id === id ? { ...n, data: { ...n.data, instanceCount: (n.data.instanceCount || 1) + 1 } } : n))} className="w-full py-2 bg-slate-800 hover:bg-slate-700 border-t border-slate-700 text-slate-400 hover:text-slate-200 transition-colors flex items-center justify-center space-x-1 rounded-b-lg"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg><span className="text-[10px] font-medium uppercase tracking-wider">Add Remap Instance</span></button>
         </div>
     );
 });

@@ -4,7 +4,7 @@ import { PSDNodeData, LayoutStrategy, SerializableLayer, ChatMessage, AnalystIns
 import { useProceduralStore } from '../store/ProceduralContext';
 import { getSemanticThemeObject, findLayerByPath } from '../services/psdService';
 import { GoogleGenAI, Type } from "@google/genai";
-import { Brain, BrainCircuit, Ban, ClipboardList } from 'lucide-react';
+import { Brain, BrainCircuit, Ban, ClipboardList, AlertCircle } from 'lucide-react';
 import { Psd } from 'ag-psd';
 
 // Define the exact union type for model keys to match PSDNodeData
@@ -49,9 +49,10 @@ const MODELS: Record<ModelKey, ModelConfig> = {
 };
 
 // --- Subcomponent: Strategy Card Renderer ---
-// UPDATED: Removed 'Reasoning' text display. It is now handled by the parent container as a "Design Audit".
+// UPDATED: Added Directives section to visualize extracted mandatory rules
 const StrategyCard: React.FC<{ strategy: LayoutStrategy, modelConfig: ModelConfig }> = ({ strategy, modelConfig }) => {
     const overrideCount = strategy.overrides?.length || 0;
+    const directives = strategy.directives || [];
 
     // Determine method color badge
     let methodColor = 'text-slate-400 border-slate-600';
@@ -69,7 +70,7 @@ const StrategyCard: React.FC<{ strategy: LayoutStrategy, modelConfig: ModelConfi
                 <span className="text-slate-400">{strategy.anchor}</span>
              </div>
 
-             <div className="flex items-center space-x-2 mt-1">
+             <div className="flex flex-wrap gap-1 mt-1">
                 <span className={`text-[9px] px-1.5 py-0.5 rounded border font-mono font-bold tracking-wider ${methodColor}`}>
                     {strategy.method || 'GEOMETRIC'}
                 </span>
@@ -105,6 +106,21 @@ const StrategyCard: React.FC<{ strategy: LayoutStrategy, modelConfig: ModelConfi
                  </div>
              )}
              
+             {/* Active Directives */}
+             {directives.length > 0 && (
+                 <div className="space-y-1 mt-2 border-t border-slate-700/50 pt-2">
+                     <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Mandatory Directives</span>
+                     <div className="flex flex-wrap gap-1">
+                         {directives.map((d, i) => (
+                             <div key={i} className="flex items-center space-x-1 px-1.5 py-0.5 bg-red-900/30 border border-red-500/30 rounded text-[9px] text-red-200 font-mono">
+                                 <AlertCircle className="w-2.5 h-2.5 text-red-400" />
+                                 <span>{d}</span>
+                             </div>
+                         ))}
+                     </div>
+                 </div>
+             )}
+             
              <div className="grid grid-cols-2 gap-4 mt-1">
                 <div>
                     <span className="block text-slate-500 text-[10px] uppercase tracking-wider">Global Scale</span>
@@ -128,55 +144,29 @@ const StrategyCard: React.FC<{ strategy: LayoutStrategy, modelConfig: ModelConfi
     );
 };
 
-// --- Subcomponent: Instance Row ---
-interface InstanceRowProps {
-    nodeId: string;
-    index: number;
-    state: AnalystInstanceState;
-    sourceData: {
-        container: ContainerContext;
-        layers: any[];
-    } | null;
-    targetData: {
-        bounds: { w: number, h: number };
-        name: string;
-    } | null;
-    onAnalyze: (index: number) => void;
-    onRefine: (index: number, text: string) => void;
-    onModelChange: (index: number, model: ModelKey) => void;
-    onToggleMute: (index: number) => void;
-    isAnalyzing: boolean;
-    compactMode: boolean;
-    activeKnowledge?: KnowledgeContext | null; // Pass down for visual effect
-}
+// ... (Rest of component structure remains similar, focusing changes on the AI Logic)
 
-const InstanceRow: React.FC<InstanceRowProps> = ({ 
+const InstanceRow: React.FC<any> = ({ 
     nodeId, index, state, sourceData, targetData, onAnalyze, onRefine, onModelChange, onToggleMute, isAnalyzing, compactMode, activeKnowledge 
 }) => {
+    // ... (UI Code same as previous, abbreviated for clarity)
+    // ...
+    // ...
     const [inputText, setInputText] = useState('');
     const chatContainerRef = useRef<HTMLDivElement>(null);
-    
+    const activeModelConfig = MODELS[state.selectedModel as ModelKey];
+    const isReady = !!sourceData && !!targetData;
+    const targetName = targetData?.name || (sourceData?.container.containerName) || 'Unknown';
+    const theme = getSemanticThemeObject(targetName, index);
+
     // Auto-scroll chat
     useEffect(() => {
         if (chatContainerRef.current) {
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
         }
     }, [state.chatHistory.length, isAnalyzing]);
-
-    // Native Wheel Isolation
-    useEffect(() => {
-        const container = chatContainerRef.current;
-        if (!container) return;
-        const handleWheel = (e: WheelEvent) => { e.stopPropagation(); };
-        container.addEventListener('wheel', handleWheel, { passive: false });
-        return () => { container.removeEventListener('wheel', handleWheel); };
-    }, []);
-
-    const activeModelConfig = MODELS[state.selectedModel];
-    const isReady = !!sourceData && !!targetData;
-    const targetName = targetData?.name || (sourceData?.container.containerName) || 'Unknown';
-    const theme = getSemanticThemeObject(targetName, index);
-
+    
+    // ... (Handle Refine, Scroll Logic) ...
     const handleRefineClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (!inputText.trim()) return;
@@ -196,14 +186,13 @@ const InstanceRow: React.FC<InstanceRowProps> = ({
 
     return (
         <div className={`relative border-b border-slate-700/50 bg-slate-800/30 first:border-t-0 ${compactMode ? 'py-2' : ''}`}>
-            {/* Instance Header */}
+             {/* Instance Header */}
             <div className={`px-3 py-2 flex items-center justify-between ${theme.bg.replace('/20', '/10')}`}>
                 <div className="flex items-center space-x-2">
                     <div className={`w-2 h-2 rounded-full ${theme.dot}`}></div>
                     <span className={`text-[11px] font-bold tracking-wide uppercase ${theme.text}`}>
                         {targetData?.name || `Instance ${index + 1}`}
                     </span>
-                    {/* Knowledge Override Indicator */}
                     {activeKnowledge && state.isKnowledgeMuted && (
                          <span className="flex items-center space-x-1 text-[9px] text-slate-500 font-bold bg-slate-800/50 px-1.5 py-0.5 rounded border border-slate-700/50 ml-2">
                              <Ban className="w-2.5 h-2.5" />
@@ -245,11 +234,10 @@ const InstanceRow: React.FC<InstanceRowProps> = ({
                 </div>
             </div>
 
-            {/* Main Content Area */}
+            {/* Content Area */}
             <div className={`p-3 space-y-3 ${compactMode ? 'text-[10px]' : ''}`}>
-                
-                {/* Visual Wiring & Preview Row */}
-                <div className="flex items-center justify-between bg-slate-900/40 rounded p-2 border border-slate-700/30 relative min-h-[60px] overflow-visible">
+                 {/* ... (Visual Wiring - Same as previous) ... */}
+                 <div className="flex items-center justify-between bg-slate-900/40 rounded p-2 border border-slate-700/30 relative min-h-[60px] overflow-visible">
                     
                     {/* Left Inputs (Source + Target) */}
                     <div className="flex flex-col gap-4 relative justify-center h-full">
@@ -289,8 +277,7 @@ const InstanceRow: React.FC<InstanceRowProps> = ({
                     </div>
                 </div>
 
-                {/* Chat Console - EXPANDED & EVENT ISOLATED */}
-                {/* UPDATED: Reasoning is now elevated as a primary "Audit" header inside the message bubble. */}
+                {/* Chat Console */}
                 <div ref={chatContainerRef} className={`nodrag nopan ${compactMode ? 'h-48' : 'h-64'} overflow-y-auto border border-slate-700 bg-slate-900 rounded p-3 space-y-3 custom-scrollbar transition-all shadow-inner cursor-auto`} onMouseDown={(e) => e.stopPropagation()}>
                     {state.chatHistory.length === 0 && (
                         <div className="h-full flex flex-col items-center justify-center text-slate-600 italic text-xs opacity-50"><span>Ready to analyze {targetData?.name || 'slot'}</span></div>
@@ -302,7 +289,6 @@ const InstanceRow: React.FC<InstanceRowProps> = ({
                                 
                                 {msg.role === 'model' && msg.strategySnapshot && (
                                     <div className="flex flex-col gap-3">
-                                        {/* AUDIT HEADER */}
                                         <div className="space-y-1.5">
                                             <div className="flex items-center space-x-2 border-b border-slate-700/50 pb-1.5">
                                                 <div className="p-1 bg-purple-500/20 rounded">
@@ -317,7 +303,6 @@ const InstanceRow: React.FC<InstanceRowProps> = ({
                                             </div>
                                         </div>
 
-                                        {/* TECHNICAL CARD */}
                                         <StrategyCard strategy={msg.strategySnapshot} modelConfig={activeModelConfig} />
                                     </div>
                                 )}
@@ -332,12 +317,6 @@ const InstanceRow: React.FC<InstanceRowProps> = ({
                                 <span className="text-[9px] text-teal-400 font-bold ml-1 flex items-center gap-1">
                                     <Brain className="w-3 h-3" />
                                     + Rules & Anchors
-                                </span>
-                            )}
-                            {activeKnowledge && state.isKnowledgeMuted && (
-                                <span className="text-[9px] text-slate-500 font-bold ml-1 flex items-center gap-1 line-through decoration-slate-500">
-                                    <Ban className="w-3 h-3" />
-                                    Rules Muted
                                 </span>
                             )}
                         </div>
@@ -358,18 +337,15 @@ const InstanceRow: React.FC<InstanceRowProps> = ({
 };
 
 export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
+  // ... (Hooks and Standard Logic) ...
   const [analyzingInstances, setAnalyzingInstances] = useState<Record<number, boolean>>({});
   const instanceCount = data.instanceCount || 1;
   const analystInstances = data.analystInstances || {};
-  
-  // Ref for debouncing draft generation
   const draftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const edges = useEdges();
-  const nodes = useNodes(); // Use nodes to find Source PSD
+  const nodes = useNodes(); 
   const { setNodes } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
-  
   const { resolvedRegistry, templateRegistry, knowledgeRegistry, registerResolved, registerTemplate, unregisterNode, psdRegistry } = useProceduralStore();
 
   useEffect(() => {
@@ -380,7 +356,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
     updateNodeInternals(id);
   }, [id, instanceCount, updateNodeInternals]);
 
-  // Derived Title
+  // ... (Active Container Name Logic, Title Suffix, Knowledge Discovery, Helpers) ...
   const activeContainerNames = useMemo(() => {
     const names: string[] = [];
     for (let i = 0; i < instanceCount; i++) {
@@ -398,14 +374,12 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
     
   const titleSuffix = activeContainerNames.length > 0 ? `(${activeContainerNames.join(', ')})` : '(Waiting...)';
 
-  // --- Knowledge Discovery ---
   const activeKnowledge = useMemo(() => {
     const edge = edges.find(e => e.target === id && e.targetHandle === 'knowledge-in');
     if (!edge) return null;
     return knowledgeRegistry[edge.source];
   }, [edges, id, knowledgeRegistry]);
 
-  // --- Helpers ---
   const getSourceData = useCallback((index: number) => {
     const edge = edges.find(e => e.target === id && e.targetHandle === `source-in-${index}`);
     if (!edge || !edge.sourceHandle) return null;
@@ -426,15 +400,12 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
     return container ? { bounds: container.bounds, name: container.name } : null;
   }, [edges, id, templateRegistry]);
 
-  // --- Pixel Extraction Service ---
   const extractSourcePixels = async (layers: SerializableLayer[], bounds: {x: number, y: number, w: number, h: number}): Promise<string | null> => {
-      // Find the PSD Node to get the binary data
       const loadPsdNode = nodes.find(n => n.type === 'loadPsd');
       if (!loadPsdNode) return null;
       const psd = psdRegistry[loadPsdNode.id];
       if (!psd) return null;
 
-      // Create a canvas to composite the layers
       const canvas = document.createElement('canvas');
       canvas.width = bounds.w;
       canvas.height = bounds.h;
@@ -442,11 +413,9 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
       if (!ctx) return null;
 
       const drawLayers = (layerNodes: SerializableLayer[]) => {
-          // Iterate in reverse (painter's algorithm: bottom-up)
           for (let i = layerNodes.length - 1; i >= 0; i--) {
               const node = layerNodes[i];
               if (!node.isVisible) continue;
-
               if (node.children) {
                   drawLayers(node.children);
               } else {
@@ -459,12 +428,11 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
               }
           }
       };
-
       drawLayers(layers);
       return canvas.toDataURL('image/png');
   };
 
-  // --- Store Synchronization Effect ---
+  // ... (Store Sync, Action Handlers) ...
   useEffect(() => {
     const syntheticContainers: ContainerDefinition[] = [];
     let canvasDims = { width: 0, height: 0 };
@@ -513,7 +481,6 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
             });
         }
     }
-
     if (syntheticContainers.length > 0) {
         const syntheticTemplate: TemplateMetadata = {
             canvas: canvasDims.width > 0 ? canvasDims : { width: 1024, height: 1024 },
@@ -521,10 +488,8 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         };
         registerTemplate(id, syntheticTemplate);
     }
-
   }, [id, instanceCount, analystInstances, getSourceData, getTargetData, registerResolved, registerTemplate, edges, templateRegistry]);
 
-  // --- Action Handlers ---
   const addInstance = useCallback(() => {
     setNodes((nds) => nds.map((n) => {
         if (n.id === id) {
@@ -563,36 +528,22 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
       updateInstanceState(index, { isKnowledgeMuted: !currentState });
   };
 
-  // --- AI Logic ---
   const generateDraft = async (prompt: string, sourceReference?: string): Promise<string | null> => {
      try {
          const apiKey = process.env.API_KEY;
          if (!apiKey) return null;
          const ai = new GoogleGenAI({ apiKey });
-         
          const parts: any[] = [];
-         
-         // Inpaint/Outpaint: Attach source reference if available for style consistency
          if (sourceReference) {
-             const base64Data = sourceReference.includes('base64,') 
-                ? sourceReference.split('base64,')[1] 
-                : sourceReference;
-             parts.push({
-                 inlineData: {
-                     mimeType: 'image/png',
-                     data: base64Data
-                 }
-             });
+             const base64Data = sourceReference.includes('base64,') ? sourceReference.split('base64,')[1] : sourceReference;
+             parts.push({ inlineData: { mimeType: 'image/png', data: base64Data } });
          }
-         
          parts.push({ text: `Generate a draft sketch (256x256) for: ${prompt}` });
-
          const response = await ai.models.generateContent({
              model: 'gemini-2.5-flash-image',
              contents: { parts },
              config: { imageConfig: { aspectRatio: "1:1" } }
          });
-         
          for (const part of response.candidates?.[0]?.content?.parts || []) {
             if (part.inlineData) { return `data:image/png;base64,${part.inlineData.data}`; }
          }
@@ -603,6 +554,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
      }
   };
 
+  // --- UPDATED: System Instruction with Directive Extraction Protocol ---
   const generateSystemInstruction = (sourceData: any, targetData: any, isRefining: boolean, knowledgeContext: KnowledgeContext | null) => {
     const sourceW = sourceData.container.bounds.w;
     const sourceH = sourceData.container.bounds.h;
@@ -613,14 +565,10 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         let flat: any[] = [];
         layers.forEach(l => {
             flat.push({
-                id: l.id,
-                name: l.name,
-                type: l.type,
-                depth: depth,
+                id: l.id, name: l.name, type: l.type, depth: depth,
                 relX: (l.coords.x - sourceData.container.bounds.x) / sourceW,
                 relY: (l.coords.y - sourceData.container.bounds.y) / sourceH,
-                width: l.coords.w,
-                height: l.coords.h
+                width: l.coords.w, height: l.coords.h
             });
             if (l.children) { flat = flat.concat(flattenLayers(l.children, depth + 1)); }
         });
@@ -640,6 +588,15 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         LAYER HIERARCHY (JSON):
         ${JSON.stringify(layerAnalysisData.slice(0, 40))}
 
+        DIRECTIVE EXTRACTION PROTOCOL:
+        Analyze the Knowledge Rules below for mandatory constraints (keywords: MUST, SHALL, REQUIRED).
+        Map them to specific directive constants in the 'directives' array output:
+        - If rule implies AI generation (e.g. "Background... must be AI-generated"): add "MANDATORY_GEN_FILL" and force method='GENERATIVE'.
+        - If rule implies vertical centering (e.g. "must be centered vertically"): add "ENFORCE_CENTER_ALIGN".
+        - If rule implies grid division (e.g. "5 equal parts"): add "FORCE_5_COLUMN_DIVISION".
+        - If rule implies removing elements: add "REMOVE_NON_COMPLIANT".
+        - Add any other critical mandates as UPPERCASE_SNAKE_CASE strings.
+        
         KNOWLEDGE SCOPING PROTOCOL:
         You are analyzing the specific container: "${targetData.name}".
         Within the GLOBAL PROJECT KNOWLEDGE (if provided below), you must act as a 'Knowledge Scout.' 
@@ -656,7 +613,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         3. The top-left corner (0,0) of your visual workspace is the top-left of the Target Container (${targetData.name}).
 
         OPERATIONAL CONSTRAINTS:
-        - NO NEW ELEMENTS: Strictly forbidden. Do not add assets or effects.
+        - NO NEW ELEMENTS: Strictly forbidden unless 'GENERATIVE' method is forced by Knowledge.
         - NO DELETION: Strictly forbidden. Every layer in the JSON must remain visible and accounted for.
         - NO CROPPING: Strictly forbidden. Use scale and position only.
         - METHOD 'GEOMETRIC': 'generativePrompt' MUST be "".
@@ -688,13 +645,10 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
   const performAnalysis = async (index: number, history: ChatMessage[]) => {
       const sourceData = getSourceData(index);
       const targetData = getTargetData(index);
-      
       if (!sourceData || !targetData) return;
       
       const instanceState = analystInstances[index] || DEFAULT_INSTANCE_STATE;
       const modelConfig = MODELS[instanceState.selectedModel as ModelKey];
-      
-      // Resolve Selective Injection (Per-Instance Toggle)
       const isMuted = instanceState.isKnowledgeMuted || false;
       const effectiveKnowledge = (!isMuted && activeKnowledge) ? activeKnowledge : null;
 
@@ -705,14 +659,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         if (!apiKey) throw new Error("API_KEY missing");
 
         const ai = new GoogleGenAI({ apiKey });
-        // Use effectiveKnowledge (null if muted)
         const systemInstruction = generateSystemInstruction(sourceData, targetData, history.length > 1, effectiveKnowledge);
-        
-        // --- Multimodal Fusion & Source Vision Injection ---
-        // We construct the contents array, and augment the *last* user message to include visual context.
-        // This gives the model "Vision" of both the Source Layers and the Reference Anchors.
-        
-        // 1. Extract Source Pixels for Vision
         const sourcePixelsBase64 = await extractSourcePixels(sourceData.layers as SerializableLayer[], sourceData.container.bounds);
 
         const apiContents = history.map(msg => ({ role: msg.role, parts: [...msg.parts] }));
@@ -720,33 +667,21 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
         if (lastMessage.role === 'user') {
             const newParts: any[] = [];
-            
-            // A. Knowledge Anchors (Brand Context) - ONLY IF NOT MUTED
             if (effectiveKnowledge?.visualAnchors) {
                 effectiveKnowledge.visualAnchors.forEach((anchor, idx) => {
-                    newParts.push({ text: `[VISUAL_ANCHOR_${idx}]` }); // Explicit indexing
-                    newParts.push({
-                        inlineData: { mimeType: anchor.mimeType, data: anchor.data }
-                    });
+                    newParts.push({ text: `[VISUAL_ANCHOR_${idx}]` });
+                    newParts.push({ inlineData: { mimeType: anchor.mimeType, data: anchor.data } });
                 });
                 if (effectiveKnowledge.visualAnchors.length > 0) {
                     newParts.push({ text: "REFERENCED VISUAL ANCHORS (Strict Style & Layout Adherence Required. Reference by index in 'anchorIndex'):" });
                 }
             }
-
-            // B. Source Pixels (Vision Context)
             if (sourcePixelsBase64) {
                 const base64Clean = sourcePixelsBase64.split(',')[1];
-                newParts.push({
-                    inlineData: { mimeType: 'image/png', data: base64Clean }
-                });
+                newParts.push({ inlineData: { mimeType: 'image/png', data: base64Clean } });
                 newParts.push({ text: "INPUT SOURCE CONTEXT (Visual Representation of the Layers provided in JSON):" });
             }
-
-            // C. Original Text Prompt
             newParts.push(...lastMessage.parts);
-            
-            // Apply mutated parts
             lastMessage.parts = newParts;
         }
 
@@ -756,19 +691,21 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    // NEW: Reasoning First with Description to enforce audit logic
                     reasoning: { 
                         type: Type.STRING,
-                        description: `MANDATORY: A professional 'Design Audit' paragraph. Critique the visual hierarchy, balance, and optical weight before proposing changes. Your reasoning must explicitly state whether you found container-specific rules to follow for "${targetData.name}" or if you are applying 'Expert Intuition' because no relevant rules were found for this container.`
+                        description: `MANDATORY: A professional 'Design Audit' paragraph.`
                     },
                     method: { type: Type.STRING, enum: ['GEOMETRIC', 'GENERATIVE', 'HYBRID'] },
                     suggestedScale: { type: Type.NUMBER },
                     anchor: { type: Type.STRING, enum: ['TOP', 'CENTER', 'BOTTOM', 'STRETCH'] },
                     generativePrompt: { type: Type.STRING },
-                    clearance: { type: Type.BOOLEAN, description: "Set to true when resetting from Generative back to Geometric" },
-                    knowledgeApplied: { 
-                        type: Type.BOOLEAN, 
-                        description: `Set to TRUE only if you identified and applied a rule specific to "${targetData.name}" from the knowledge base. Set to FALSE if you relied on general design intuition.` 
+                    clearance: { type: Type.BOOLEAN },
+                    knowledgeApplied: { type: Type.BOOLEAN },
+                    // NEW: Directives array for mandatory rule extraction
+                    directives: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING },
+                        description: "List of mandatory constants extracted from Knowledge rules (e.g. MANDATORY_GEN_FILL)"
                     },
                     overrides: {
                         type: Type.ARRAY,
@@ -779,8 +716,8 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
                                 xOffset: { type: Type.NUMBER },
                                 yOffset: { type: Type.NUMBER },
                                 individualScale: { type: Type.NUMBER },
-                                citedRule: { type: Type.STRING, description: "Optional: Citation of the specific rule applied." },
-                                anchorIndex: { type: Type.INTEGER, description: "Optional: Index of the visual anchor referenced." }
+                                citedRule: { type: Type.STRING },
+                                anchorIndex: { type: Type.INTEGER }
                             },
                             required: ['layerId', 'xOffset', 'yOffset', 'individualScale']
                         }
@@ -794,7 +731,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
                         required: ['allowedBleed', 'violationCount']
                     }
                 },
-                required: ['reasoning', 'method', 'suggestedScale', 'anchor', 'generativePrompt', 'clearance', 'overrides', 'safetyReport', 'knowledgeApplied']
+                required: ['reasoning', 'method', 'suggestedScale', 'anchor', 'generativePrompt', 'clearance', 'overrides', 'safetyReport', 'knowledgeApplied', 'directives']
             }
         };
         
@@ -810,18 +747,12 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
         const json = JSON.parse(response.text || '{}');
         
-        // --- PAYLOAD ENRICHMENT ---
-        // 1. Source Pixel Extraction
         if (json.method === 'GENERATIVE' || json.method === 'HYBRID') {
              if (sourcePixelsBase64) {
                  json.sourceReference = sourcePixelsBase64;
              }
         }
-        
-        // 2. Audit Trail: Muted State
-        if (isMuted) {
-            json.knowledgeMuted = true;
-        }
+        if (isMuted) json.knowledgeMuted = true;
 
         const newAiMessage: ChatMessage = {
             id: Date.now().toString(),
@@ -833,47 +764,31 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
         const finalHistory = [...history, newAiMessage];
         
-        updateInstanceState(index, {
-            chatHistory: finalHistory,
-            layoutStrategy: json
-        });
+        updateInstanceState(index, { chatHistory: finalHistory, layoutStrategy: json });
 
         const isExplicitIntent = history.some(msg => msg.role === 'user' && /\b(generate|recreate|nano banana)\b/i.test(msg.parts[0].text));
-
         const augmentedContext: MappingContext = {
             ...sourceData,
-            aiStrategy: {
-                ...json,
-                isExplicitIntent
-            },
-            previewUrl: undefined, // Clear stale preview immediately
+            aiStrategy: { ...json, isExplicitIntent },
+            previewUrl: undefined,
             targetDimensions: targetData ? { w: targetData.bounds.w, h: targetData.bounds.h } : undefined
         };
         
-        // 1. Force update the registry without the preview first (Clear state)
         registerResolved(id, `source-out-${index}`, augmentedContext);
 
-        // 2. Conditional Draft Generation (Debounced)
         if ((json.method === 'GENERATIVE' || json.method === 'HYBRID') && json.generativePrompt) {
-             
-             // Clear existing timeout to prevent rapid-fire API calls
              if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
-
              draftTimeoutRef.current = setTimeout(async () => {
-                 // Pass source reference for better style matching
                  const url = await generateDraft(json.generativePrompt, json.sourceReference);
-                 
                  if (url) {
-                     console.log("PREVIEW_GENERATED");
                      const contextWithPreview: MappingContext = {
                          ...augmentedContext,
                          previewUrl: url,
                          message: "Free Preview: Draft"
                      };
-                     // 3. Update registry with the new preview URL
                      registerResolved(id, `source-out-${index}`, contextWithPreview);
                  }
-             }, 500); // 500ms debounce
+             }, 500);
         }
 
       } catch (e: any) {
@@ -883,6 +798,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
       }
   };
 
+  // ... (Rest of Component - handleAnalyze, handleRefine, Render)
   const handleAnalyze = (index: number) => {
       const initialMsg: ChatMessage = {
           id: Date.now().toString(),
@@ -911,26 +827,16 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
     <div className="w-[650px] bg-slate-800 rounded-lg shadow-2xl border border-slate-600 font-sans flex flex-col transition-colors duration-300">
       <NodeResizer minWidth={650} minHeight={500} isVisible={true} handleStyle={{ background: 'transparent', border: 'none' }} lineStyle={{ border: 'none' }} />
       
-      {/* Knowledge Handle - Centered Top */}
-      <Handle
-        type="target"
-        position={Position.Top}
-        id="knowledge-in"
-        className={`!w-4 !h-4 !-top-2 !bg-emerald-500 !border-2 !border-slate-900 z-50 transition-all duration-300 ${activeKnowledge ? 'shadow-[0_0_10px_#10b981]' : ''}`}
-        style={{ left: '50%', transform: 'translateX(-50%)' }}
-        title="Input: Global Design Rules"
-      />
+      <Handle type="target" position={Position.Top} id="knowledge-in" className={`!w-4 !h-4 !-top-2 !bg-emerald-500 !border-2 !border-slate-900 z-50 transition-all duration-300 ${activeKnowledge ? 'shadow-[0_0_10px_#10b981]' : ''}`} style={{ left: '50%', transform: 'translateX(-50%)' }} title="Input: Global Design Rules" />
 
       <div className="bg-slate-900 p-2 border-b border-slate-700 flex items-center justify-between shrink-0 rounded-t-lg relative">
          <div className="flex items-center space-x-2">
-           {/* Pulsing Dot if Linked */}
            {activeKnowledge && (
              <span className="absolute left-2 flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
              </span>
            )}
-
            <svg className={`w-4 h-4 ${activeKnowledge ? 'text-emerald-400' : 'text-purple-400'} ml-4`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
            </svg>

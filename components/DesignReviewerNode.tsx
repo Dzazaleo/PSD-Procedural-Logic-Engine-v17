@@ -5,7 +5,7 @@ import { useProceduralStore } from '../store/ProceduralContext';
 import { findLayerByPath } from '../services/psdService';
 import { GoogleGenAI, Type } from "@google/genai";
 import { Psd } from 'ag-psd';
-import { Activity, ShieldCheck, Maximize, RotateCw, ArrowRight, ScanEye } from 'lucide-react';
+import { Activity, ShieldCheck, Maximize, RotateCw, ArrowRight, ScanEye, BookOpen } from 'lucide-react';
 
 const DEFAULT_REVIEWER_STATE: ReviewerInstanceState = {
     chatHistory: [],
@@ -179,11 +179,13 @@ const ReviewerInstanceRow: React.FC<{
     state: ReviewerInstanceState;
     incomingPayload: TransformedPayload | null;
     onReview: (index: number) => void;
+    onUpdateState: (index: number, updates: Partial<ReviewerInstanceState>) => void;
     isProcessing: boolean;
-}> = ({ index, nodeId, state, incomingPayload, onReview, isProcessing }) => {
+}> = ({ index, nodeId, state, incomingPayload, onReview, onUpdateState, isProcessing }) => {
     const isReady = !!incomingPayload;
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const { registerReviewerPayload } = useProceduralStore();
+    const lastProcessedGenerationId = useRef<number | undefined>(undefined);
 
     // Isolated Scroll
     useEffect(() => {
@@ -201,6 +203,43 @@ const ReviewerInstanceRow: React.FC<{
         }
     }, [state.chatHistory]);
 
+    // STALE GUARD & AUDIT RESET
+    useEffect(() => {
+        if (!incomingPayload) return;
+        
+        const currentGenId = incomingPayload.generationId;
+        const previousGenId = lastProcessedGenerationId.current;
+
+        // Initialize Ref if undefined
+        if (previousGenId === undefined && currentGenId !== undefined) {
+            lastProcessedGenerationId.current = currentGenId;
+            return;
+        }
+
+        // Logic: If Upstream Generation ID changes, the current audit is Stale.
+        if (previousGenId !== undefined && currentGenId !== previousGenId) {
+            console.log(`[Reviewer] Stale audit detected for instance ${index}. Resetting.`);
+            
+            const sysMsg: ChatMessage = {
+                id: `sys-${Date.now()}`,
+                role: 'model',
+                parts: [{ text: "⚠️ [SYSTEM]: Upstream change detected. Previous audit invalidated." }],
+                timestamp: Date.now()
+            };
+
+            // Reset local strategy
+            onUpdateState(index, {
+                reviewerStrategy: null,
+                chatHistory: [...state.chatHistory, sysMsg]
+            });
+            
+            // Sync store to remove old polished data immediately
+            // Note: The main effect below will also catch the strategy nullification, 
+            // but we update ref here to acknowledge the new state.
+            lastProcessedGenerationId.current = currentGenId;
+        }
+    }, [incomingPayload?.generationId, index, onUpdateState, state.chatHistory]);
+
     // Apply Overrides Effect (State -> Store)
     useEffect(() => {
         if (!incomingPayload) return;
@@ -210,7 +249,7 @@ const ReviewerInstanceRow: React.FC<{
             const finalPayload = applyOverridesToPayload(incomingPayload, state.reviewerStrategy.overrides);
             registerReviewerPayload(nodeId, `polished-out-${index}`, finalPayload);
         } else {
-            // Pass-through if no audit performed yet
+            // Pass-through if no audit performed yet (or reset)
             const cleanPayload = { ...incomingPayload, isPolished: false };
             registerReviewerPayload(nodeId, `polished-out-${index}`, cleanPayload);
         }
@@ -244,6 +283,13 @@ const ReviewerInstanceRow: React.FC<{
                         {incomingPayload?.targetContainer || `Auditor ${index + 1}`}
                     </span>
                 </div>
+                {/* Active Directives Badge */}
+                {incomingPayload?.directives && incomingPayload.directives.length > 0 && (
+                    <div className="flex items-center space-x-1 pr-2">
+                        <BookOpen className="w-3 h-3 text-teal-400" />
+                        <span className="text-[8px] text-teal-300 font-mono">{incomingPayload.directives.length} Rules Active</span>
+                    </div>
+                )}
             </div>
 
             {/* Audit Console */}
@@ -264,8 +310,17 @@ const ReviewerInstanceRow: React.FC<{
                                 {msg.parts[0].text}
                             </div>
                             {msg.strategySnapshot && (
-                                <div className="mt-1 pl-2 text-emerald-600/80 italic text-[8px]">
-                                    &gt; Applied {msg.strategySnapshot.overrides.length} surgical nudges.
+                                <div className="mt-1 pl-2 text-emerald-600/80 italic text-[8px] space-y-0.5">
+                                    <div className="flex items-center gap-1">
+                                        <ArrowRight className="w-2 h-2" />
+                                        <span>Applied {msg.strategySnapshot.overrides.length} surgical nudges.</span>
+                                    </div>
+                                    {/* Show a sample rule citation if available */}
+                                    {msg.strategySnapshot.overrides[0]?.citedRule && (
+                                        <div className="text-[7px] text-teal-500/70 truncate pl-3">
+                                            "{msg.strategySnapshot.overrides[0].citedRule}"
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -338,6 +393,26 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
     return () => unregisterNode(id);
   }, [id, unregisterNode]);
 
+  const updateInstanceState = useCallback((index: number, updates: Partial<ReviewerInstanceState>) => {
+    setNodes((nds) => nds.map((n) => {
+        if (n.id === id) {
+            const currentInstances = n.data.reviewerInstances || {};
+            const oldState = currentInstances[index] || DEFAULT_REVIEWER_STATE;
+            return {
+                ...n,
+                data: {
+                    ...n.data,
+                    reviewerInstances: {
+                        ...currentInstances,
+                        [index]: { ...oldState, ...updates }
+                    }
+                }
+            };
+        }
+        return n;
+    }));
+  }, [id, setNodes]);
+
   const getIncomingPayload = useCallback((index: number) => {
     const edge = edges.find(e => e.target === id && e.targetHandle === `payload-in-${index}`);
     if (!edge) return null;
@@ -385,13 +460,19 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
             CONTEXT:
             - Target Container: ${payload.targetContainer}
             - Current Scale Factor: ${payload.scaleFactor}
+            - Active Directives: ${JSON.stringify(payload.directives || [])}
             
             INPUT:
             1. An image of the current procedural layout (Rendered).
             2. A JSON list of layers corresponding to that image.
             
+            RELATIVE ALIGNMENT VALIDATOR PROTOCOL:
+            1. Analyze "Optical Equidistance": Check distances between layers sharing semantic boundaries (e.g., Frame vs Background, Text vs Container Edge).
+            2. SNAP ENFORCEMENT: If 'ZERO_GAP_ALIGNMENT' or 'NO_GAPS' directive is active, identify any gaps > 0px between structural elements.
+            3. DRIFT CORRECTION: If a gap is detected between "snapped" layers, calculate the precise xOffset/yOffset required to achieve a 0px delta. Prioritize moving the secondary layer (child) to meet the primary (parent).
+            
             YOUR JOB:
-            Identify aesthetic collisions (e.g., text overlapping objects, awkward tangents, visual imbalance) that purely mathematical resizing missed.
+            Identify aesthetic collisions (e.g., text overlapping objects, awkward tangents, visual imbalance) and geometric drifts.
             Provide precise 'nudges' (offsets, scale adjustments) to achieve Optical Equilibrium.
             
             RULES:
@@ -399,12 +480,20 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
             - DO NOT delete layers.
             - ONLY apply offsets (xOffset, yOffset) and micro-scaling (individualScale).
             - 'individualScale' is a multiplier (e.g. 0.95 = shrink 5%).
+            - ATTRIBUTION: For every override, you MUST provide a 'citedRule' string explaining the aesthetic reason (e.g., "Corrected 3px drift to satisfy 'No Gaps'").
             
             OUTPUT JSON:
             {
                 "CARO_Audit": "Brief, clinical report of friction points found (e.g., 'Corrected overlap between Prize Text and Bottle neck').",
                 "overrides": [
-                    { "layerId": "string (must match input)", "xOffset": number, "yOffset": number, "individualScale": number, "rotation": number }
+                    { 
+                        "layerId": "string (must match input)", 
+                        "xOffset": number, 
+                        "yOffset": number, 
+                        "individualScale": number, 
+                        "rotation": number,
+                        "citedRule": "string (Mandatory)" 
+                    }
                 ]
             }
           `;
@@ -434,9 +523,10 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
                                       xOffset: { type: Type.NUMBER },
                                       yOffset: { type: Type.NUMBER },
                                       individualScale: { type: Type.NUMBER },
-                                      rotation: { type: Type.NUMBER }
+                                      rotation: { type: Type.NUMBER },
+                                      citedRule: { type: Type.STRING }
                                   },
-                                  required: ['layerId', 'xOffset', 'yOffset', 'individualScale']
+                                  required: ['layerId', 'xOffset', 'yOffset', 'individualScale', 'citedRule']
                               }
                           }
                       },
@@ -532,6 +622,7 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
                 state={reviewerInstances[i] || { chatHistory: [], reviewerStrategy: null }}
                 incomingPayload={getIncomingPayload(i)}
                 onReview={handleReview}
+                onUpdateState={updateInstanceState}
                 isProcessing={!!processingState[i]}
               />
           ))}

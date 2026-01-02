@@ -92,6 +92,7 @@ export interface LayoutStrategy {
   generativePrompt: string;
   reasoning: string;
   overrides?: LayerOverride[];
+  directives?: string[]; // Phase 4B: Mandatory Knowledge Directives (e.g. MANDATORY_GEN_FILL)
   safetyReport?: {
     allowedBleed: boolean;
     violationCount: number;
@@ -188,6 +189,10 @@ export interface TransformedPayload {
   generationId?: number; // Timestamp of the specific generation to force React updates
   generationAllowed?: boolean; // New Flag: Per-instance enforcement state
   isPolished?: boolean; // Flag indicating if this payload has been refined by CARO
+  
+  // Phase 4B: Procedural Enforcement
+  directives?: string[]; 
+  isMandatory?: boolean; // True if Generation is forced by Directive
 }
 
 export interface RemapperConfig {

@@ -76,6 +76,26 @@ const reconcileTerminalState = (
         };
     }
 
+    // --- PHASE 4B: MANDATORY AUTO-CONFIRMATION ---
+    // If specific directives enforce generation, we bypass the confirmation queue.
+    const hasMandatoryDirective = incomingPayload.directives?.includes('MANDATORY_GEN_FILL');
+    const isForced = incomingPayload.isMandatory || hasMandatoryDirective;
+
+    if (isForced && incomingPayload.requiresGeneration) {
+        // Force Auto-Confirm
+        return {
+            ...incomingPayload,
+            status: 'success',
+            isConfirmed: true,
+            isTransient: false, // Treat as solid immediately
+            isSynthesizing: incomingPayload.isSynthesizing, // Preserve active gen state if already started
+            // Inherit valid existing data to prevent flicker
+            previewUrl: incomingPayload.previewUrl || currentPayload?.previewUrl,
+            sourceReference: incomingPayload.sourceReference || currentPayload?.sourceReference,
+            generationId: incomingPayload.generationId || currentPayload?.generationId
+        };
+    }
+
     // 1. STALE GUARD:
     // If store has a newer generation ID than incoming, reject the update.
     if (currentPayload?.generationId && incomingPayload.generationId && incomingPayload.generationId < currentPayload.generationId) {
