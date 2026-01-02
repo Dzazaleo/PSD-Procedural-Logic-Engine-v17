@@ -2,7 +2,7 @@ import React, { memo, useState, useEffect, useMemo, useCallback, useRef } from '
 import { Handle, Position, NodeProps, useEdges, NodeResizer, useReactFlow, useUpdateNodeInternals, useNodes } from 'reactflow';
 import { PSDNodeData, LayoutStrategy, SerializableLayer, ChatMessage, AnalystInstanceState, ContainerContext, TemplateMetadata, ContainerDefinition, MappingContext, KnowledgeContext } from '../types';
 import { useProceduralStore } from '../store/ProceduralContext';
-import { getSemanticThemeObject, findLayerByPath } from '../services/psdService';
+import { getSemanticThemeObject, findLayerByPath, calculateGeometricBaseline } from '../services/psdService';
 import { GoogleGenAI, Type } from "@google/genai";
 import { Brain, BrainCircuit, Ban, ClipboardList, AlertCircle, RefreshCw } from 'lucide-react';
 import { Psd } from 'ag-psd';
@@ -482,6 +482,11 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
             const history = instanceState.chatHistory || [];
             const hasExplicitKeywords = history.some(msg => msg.role === 'user' && /\b(generate|recreate|nano banana)\b/i.test(msg.parts[0].text));
             
+            // Phase 2: Calculate Geometric Baseline (Grounding Truth)
+            const baseline = (sourceData.container && targetData) 
+                ? calculateGeometricBaseline(sourceData.container.bounds, targetData.bounds) 
+                : undefined;
+
             const augmentedContext: MappingContext = {
                 ...sourceData,
                 aiStrategy: instanceState.layoutStrategy ? {
@@ -489,7 +494,8 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
                     isExplicitIntent: hasExplicitKeywords
                 } : undefined,
                 previewUrl: undefined,
-                targetDimensions: targetData ? { w: targetData.bounds.w, h: targetData.bounds.h } : undefined
+                targetDimensions: targetData ? { w: targetData.bounds.w, h: targetData.bounds.h } : undefined,
+                baseline // Inject baseline into the resolved context
             };
             
              registerResolved(id, `source-out-${i}`, augmentedContext);

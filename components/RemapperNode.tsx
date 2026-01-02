@@ -1,9 +1,10 @@
 import React, { memo, useMemo, useEffect, useCallback, useState, useRef } from 'react';
 import { Handle, Position, NodeProps, useEdges, useReactFlow, useNodes, useUpdateNodeInternals } from 'reactflow';
-import { PSDNodeData, SerializableLayer, TransformedPayload, TransformedLayer, MAX_BOUNDARY_VIOLATION_PERCENT, LayoutStrategy, LayerOverride } from '../types';
+import { PSDNodeData, SerializableLayer, TransformedPayload, TransformedLayer, MAX_BOUNDARY_VIOLATION_PERCENT, LayoutStrategy, LayerOverride, BaselineMetrics } from '../types';
 import { useProceduralStore } from '../store/ProceduralContext';
 import { GoogleGenAI } from "@google/genai";
 import { Check, Sparkles, Info, Layers, Box, Cpu, BookOpen, Link as LinkIcon } from 'lucide-react';
+import { calculateGeometricBaseline } from '../services/psdService';
 
 interface InstanceData {
   index: number;
@@ -25,6 +26,7 @@ interface InstanceData {
   };
   payload: TransformedPayload | null;
   strategyUsed?: boolean;
+  baseline?: BaselineMetrics;
 }
 
 // --- SUB-COMPONENT: Generative Preview Overlay ---
@@ -481,11 +483,15 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
 
             let payload: TransformedPayload | null = null;
             let strategyUsed = false;
+            let baseline: BaselineMetrics | undefined;
 
             if (sourceData.ready && targetData.ready) {
                 const sourceRect = sourceData.originalBounds;
                 const targetRect = targetData.bounds;
                 const strategy = sourceData.aiStrategy;
+                
+                // PHASE 2: Geometric Baseline Calculation (Grounding)
+                baseline = calculateGeometricBaseline(sourceRect, targetRect);
                 
                 // PHASE 4B: Structural Bundling Check
                 const isZeroGap = strategy?.directives?.includes('ZERO_GAP_ALIGNMENT');
@@ -616,10 +622,11 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                     generationAllowed: effectiveAllowed,
                     directives: strategy?.directives, // Propagate Directives
                     isMandatory: isMandatory, // Propagate Mandatory Flag
-                    replaceLayerId: strategy?.replaceLayerId // Track swapped ID
+                    replaceLayerId: strategy?.replaceLayerId, // Track swapped ID
+                    baseline // Inject Baseline
                 };
             }
-            result.push({ index: i, source: sourceData, target: targetData, payload, strategyUsed });
+            result.push({ index: i, source: sourceData, target: targetData, payload, strategyUsed, baseline });
         }
         return result;
     }, [instanceCount, edges, id, resolvedRegistry, templateRegistry, nodes, confirmations, payloadRegistry, globalGenerationAllowed, instanceSettings]);

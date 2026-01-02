@@ -205,6 +205,9 @@ export interface TransformedPayload {
   
   // Phase 4C: Surgical Logic
   replaceLayerId?: string | null; // Track if a specific layer was swapped
+  
+  // GBP: Phase 2 Baseline Persistence
+  baseline?: BaselineMetrics;
 }
 
 export interface RemapperConfig {
