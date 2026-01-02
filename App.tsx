@@ -225,18 +225,18 @@ const App: React.FC = () => {
             }
         }
 
-        // Container Preview Validation Rules (NEW)
+        // Container Preview Validation Rules (UPDATED for Multi-Instance)
         if (targetNode.type === 'containerPreview') {
             const handle = params.targetHandle || '';
 
-            if (handle === 'payload-in') {
+            if (handle.startsWith('payload-in')) {
                 // Accepts output from DesignReviewer (Polished) or Remapper (Draft)
                 // Strict flow: Remapper -> Reviewer -> Preview
                 if (sourceNode.type !== 'designReviewer' && sourceNode.type !== 'remapper') {
                     console.warn("Preview 'Payload Input' requires a Design Reviewer or Remapper source.");
                     return;
                 }
-            } else if (handle === 'target-in') {
+            } else if (handle.startsWith('target-in')) {
                 // Needs target definition to draw bounds accurately
                 if (sourceNode.type !== 'targetSplitter') {
                     console.warn("Preview 'Target Input' requires a Target Splitter.");
