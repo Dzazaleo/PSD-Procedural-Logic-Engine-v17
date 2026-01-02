@@ -429,8 +429,11 @@ export const compositePayloadToCanvas = async (payload: TransformedPayload, psd:
     // 3. Absolute Clear (Transparent)
     ctx.clearRect(0, 0, w, h);
 
-    // 4. Background Fill REMOVED for Transparency Support
-    // We want to see the checkerboard in the preview node, not a solid background.
+    // 4. "Safe Zone" Matte Fill
+    // Forces the output image to match target dimensions even if layers are sparse
+    // This resolves cropping issues in Object-Contain logic in preview nodes
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.5)'; // Dark Slate Safe Zone
+    ctx.fillRect(0, 0, w, h);
 
     console.log(`[COMPOSITOR] Starting render for ${payload.layers.length} root layers. Target: ${w}x${h}`);
 

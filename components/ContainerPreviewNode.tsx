@@ -163,13 +163,9 @@ const PreviewInstanceRow = memo(({ index, nodeId }: { index: number, nodeId: str
                 </div>
             </div>
 
-            {/* Main Visual Stage */}
-            <div className="flex-1 relative flex items-center justify-center overflow-hidden bg-slate-950/50 min-h-[250px] rounded border border-emerald-900/30 shadow-inner p-4">
-                 {/* Checkerboard Background - Absolute */}
-                 <div className="absolute inset-0 opacity-10 pointer-events-none" 
-                      style={{ backgroundImage: `url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/nYDCgBDAm9BGDWAAjyQc6WCgAgCT0kt0eZxtwgAAAABJRU5ErkJggg==')` }}>
-                 </div>
-
+            {/* Main Visual Stage (Refactored for Safe Zone Containment) */}
+            <div className="flex-1 relative bg-slate-900 flex items-center justify-center p-4 min-h-[300px] overflow-hidden rounded border border-emerald-900/30 shadow-inner">
+                 
                  {/* Empty State */}
                  {!incomingPayload && (
                      <div className="flex flex-col items-center text-slate-600 z-10">
@@ -192,26 +188,23 @@ const PreviewInstanceRow = memo(({ index, nodeId }: { index: number, nodeId: str
                      </div>
                  )}
 
-                 {/* Content Render */}
+                 {/* Content Render - Max Containment Strategy */}
                  {previewUrl && !isLoading && !error && (
                      <img 
                        src={previewUrl} 
                        alt="Preview" 
-                       className="w-full h-full object-contain pointer-events-none transition-transform select-none"
+                       className="max-w-full max-h-full object-contain pointer-events-none drop-shadow-2xl relative z-10"
                      />
                  )}
 
                  {/* PROCEDURAL OVERLAYS */}
                  {incomingPayload && (
-                    <>
-                        {/* Procedural Bounding Box (UI Cue - Container Frame) */}
-                        <div className="absolute inset-0 pointer-events-none z-20 m-2 border-2 border-dashed border-emerald-500/20 rounded-sm"></div>
-                        
-                        {/* Pixel Dimension Readout */}
-                        <span className="absolute bottom-3 left-3 z-30 bg-black/60 px-1.5 py-0.5 rounded text-[8px] font-mono text-emerald-400/80 border border-emerald-500/20 backdrop-blur-sm shadow-sm">
+                    <div className="absolute inset-4 border-2 border-dashed border-emerald-500/20 rounded-sm pointer-events-none z-0">
+                         {/* Pixel Dimension Readout */}
+                        <span className="absolute bottom-2 left-2 bg-black/60 px-1.5 py-0.5 rounded text-[9px] font-mono text-emerald-400/70 border border-emerald-500/20 backdrop-blur-sm">
                             {Math.round(incomingPayload.metrics.target.w)}x{Math.round(incomingPayload.metrics.target.h)}px
                         </span>
-                    </>
+                    </div>
                  )}
 
                  {/* Scanning Effect */}
@@ -301,7 +294,7 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
            <div className="flex flex-col leading-none">
              <span className="text-sm font-bold tracking-tight text-emerald-100">Visual Preview</span>
              <span className="text-[9px] font-mono font-bold tracking-widest uppercase text-emerald-500/70">
-                 MULTI-MONITOR
+                 MULTI-CHANNEL MONITOR
              </span>
            </div>
          </div>
