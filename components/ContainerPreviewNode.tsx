@@ -137,29 +137,47 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
         handleStyle={{ background: 'transparent', border: 'none' }}
       />
 
-      {/* Header - Added rounded-t-lg and overflow-hidden */}
-      <div className={`relative p-2 border-b flex items-center justify-between shrink-0 overflow-hidden rounded-t-lg backdrop-blur-md
+      {/* Header - Changed to overflow-visible to allow handle to poke out */}
+      <div className={`relative p-2 border-b flex items-center justify-between shrink-0 overflow-visible rounded-t-lg backdrop-blur-md
           ${error === 'BINARY_MISSING' 
               ? 'bg-orange-950/90 border-orange-500/30' 
               : 'bg-emerald-950/90 border-emerald-500/30'
           }`}
       >
-         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-soft-light pointer-events-none"></div>
+         {/* Noise Background Container - Clipped to corners */}
+         <div className="absolute inset-0 rounded-t-lg overflow-hidden pointer-events-none">
+            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-soft-light"></div>
+         </div>
          
          <div className="flex items-center space-x-2 z-10">
            <Eye className={`w-4 h-4 ${error === 'BINARY_MISSING' ? 'text-orange-400' : 'text-emerald-400'}`} />
            <div className="flex flex-col leading-none">
              <span className={`text-sm font-bold tracking-tight ${error === 'BINARY_MISSING' ? 'text-orange-100' : 'text-emerald-100'}`}>Visual Preview</span>
-             <span className={`text-[9px] font-mono font-bold tracking-widest ${error === 'BINARY_MISSING' ? 'text-orange-500/70' : 'text-emerald-500/70'}`}>RENDER ENGINE</span>
+             {/* Dynamic Target Container Name */}
+             <span className={`text-[9px] font-mono font-bold tracking-widest uppercase truncate max-w-[200px] ${error === 'BINARY_MISSING' ? 'text-orange-500/70' : 'text-emerald-300'}`}>
+                 {incomingPayload?.targetContainer || 'NO SIGNAL'}
+             </span>
            </div>
          </div>
-         <div className="z-10 flex space-x-2">
+
+         {/* Right Side - Badges and Output Handle */}
+         <div className="z-10 flex space-x-2 items-center mr-4">
              {isPolished && (
                  <span className="flex items-center gap-1 text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-bold uppercase tracking-widest backdrop-blur-sm">
                      <ShieldCheck className="w-2.5 h-2.5" /> Polished
                  </span>
              )}
          </div>
+
+         {/* Output Handle - Moved to Header */}
+         <Handle 
+            type="source" 
+            position={Position.Right} 
+            id="payload-out" 
+            className="!absolute !-right-1.5 !w-2.5 !h-2.5 !rounded-full !bg-emerald-500 !border-2 !border-slate-800 shadow-[0_0_8px_rgba(16,185,129,0.5)] z-50" 
+            style={{ top: '50%', transform: 'translateY(-50%)' }}
+            title="Output: Validated Payload" 
+         />
       </div>
 
       {/* Input Handles Area - Increased height slightly to accommodate vertical spacing */}
@@ -258,7 +276,7 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
           </div>
       </div>
 
-      {/* Footer - Added rounded-b-lg and overflow-hidden */}
+      {/* Footer - Removed Handle, just metrics */}
       <div className="h-8 bg-slate-950 border-t border-slate-800 flex items-center justify-between px-3 shrink-0 text-[9px] font-mono font-bold tracking-wider text-slate-500 rounded-b-lg overflow-hidden">
           <div className="flex items-center gap-3">
               {incomingPayload && (
@@ -273,11 +291,6 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
                     </div>
                   </>
               )}
-          </div>
-          
-          <div className="relative flex items-center">
-              <span className="text-[8px] font-bold text-emerald-700 mr-4 tracking-widest uppercase">Proxy Out</span>
-              <Handle type="source" position={Position.Right} id="payload-out" className="!static !w-2.5 !h-2.5 !rounded-full !bg-emerald-500 !border-2 !border-slate-800 shadow-[0_0_8px_rgba(16,185,129,0.5)]" title="Output: Validated Payload" />
           </div>
       </div>
 
