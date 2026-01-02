@@ -1,6 +1,6 @@
 import React, { memo, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Handle, Position, NodeProps, useEdges, NodeResizer, useReactFlow, useUpdateNodeInternals, useNodes } from 'reactflow';
-import { PSDNodeData, LayoutStrategy, SerializableLayer, ChatMessage, AnalystInstanceState, ContainerContext, TemplateMetadata, ContainerDefinition, MappingContext, KnowledgeContext } from '../types';
+import { PSDNodeData, LayoutStrategy, SerializableLayer, ChatMessage, AnalystInstanceState, ContainerContext, TemplateMetadata, ContainerDefinition, MappingContext, KnowledgeContext, BaselineMetrics } from '../types';
 import { useProceduralStore } from '../store/ProceduralContext';
 import { getSemanticThemeObject, findLayerByPath, calculateGeometricBaseline } from '../services/psdService';
 import { GoogleGenAI, Type } from "@google/genai";
@@ -596,8 +596,8 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
      }
   };
 
-  // --- UPDATED: System Instruction with Directive Extraction Protocol ---
-  const generateSystemInstruction = (sourceData: any, targetData: any, isRefining: boolean, knowledgeContext: KnowledgeContext | null) => {
+  // --- UPDATED: System Instruction with GBP Phase 3 Logic ---
+  const generateSystemInstruction = (sourceData: any, targetData: any, isRefining: boolean, knowledgeContext: KnowledgeContext | null, baseline?: BaselineMetrics) => {
     const sourceW = sourceData.container.bounds.w;
     const sourceH = sourceData.container.bounds.h;
     const targetW = targetData.bounds.w;
@@ -621,14 +621,36 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
     let prompt = `
         ROLE: Senior Visual Systems Lead & Expert Graphic Designer.
-        GOAL: Perform "Knowledge-Anchored Semantic Recomposition" with Intuition Fallback.
+        GOAL: Perform "Knowledge-Anchored Semantic Recomposition" (75% Knowledge / 25% Optical).
         
         CONTAINER CONTEXT:
         - Source: ${sourceData.container.containerName} (${sourceW}x${sourceH})
         - Target: ${targetData.name} (${targetW}x${targetH})
         
+        GEOMETRIC BASELINE (V0) ESTABLISHED:
+        - Scale: ${baseline?.scale.toFixed(4) || 'N/A'}
+        - Center X: ${baseline?.x.toFixed(2) || 'N/A'}
+        - Center Y: ${baseline?.y.toFixed(2) || 'N/A'}
+        A Geometric Baseline (V0) has been established. Your coordinates (0,0) represent the top-left of the Target Container. 
+        The baseline has already centered and scaled the content to fit (Uniform Fit).
+
         LAYER HIERARCHY (JSON):
         ${JSON.stringify(layerAnalysisData.slice(0, 40))}
+
+        COORDINATE PROTOCOL (DELTA RULE):
+        - Your 'overrides' must provide xOffset and yOffset as DELTAS (relative adjustments) from the Baseline V0 position.
+        - If no adjustment is needed for a layer, provide 0.
+        - xOffset: 0 means "keep centered horizontally". +10 means "move 10px right from center".
+        - yOffset: 0 means "keep centered vertically". -10 means "move 10px up from center".
+        - Do NOT provide absolute coordinates.
+
+        HYBRID REASONING PROTOCOL (75/25 SPLIT):
+        1. PRIMARY (75%): KNOWLEDGE ADHERENCE.
+           - Strictly follow the container-specific rules provided below.
+           - If a rule implies specific padding (e.g. "100px from top"), calculate the necessary delta from the centered V0 to achieve it.
+        2. SECONDARY (25%): OPTICAL EQUILIBRIUM.
+           - Use the visual input to detect awkward tangents, overlapping text, or weight imbalances that pure math cannot see.
+           - Apply micro-nudges to resolve these friction points.
 
         DIRECTIVE EXTRACTION PROTOCOL:
         Analyze the Knowledge Rules below for mandatory constraints (keywords: MUST, SHALL, REQUIRED).
@@ -641,36 +663,25 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         
         KNOWLEDGE SCOPING PROTOCOL:
         You are analyzing the specific container: "${targetData.name}".
-        Within the GLOBAL PROJECT KNOWLEDGE (if provided below), you must act as a 'Knowledge Scout.' 
-        Search only for sections, headers, or bullet points that semantically relate to "${targetData.name}" or its direct visual function. 
-        Ignore any rules belonging to other containers (e.g., if analyzing REEL, ignore BONUS or UI rules) to prevent cross-contamination.
-
-        INTUITION FALLBACK PROTOCOL:
-        If the provided Knowledge Scoping pass yields no specific results for the container "${targetData.name}", you must revert to your primary persona as a 'Senior Visual Systems Lead.' 
-        Use your expert design intuition to solve for balance, hierarchy, and optical weight.
+        Search only for sections, headers, or bullet points that semantically relate to "${targetData.name}". 
+        Ignore any rules belonging to other containers.
 
         GROUNDING PROTOCOL:
-        1. Link every visual observation to a Metadata ID [layer-ID] using the deterministic path IDs provided in the JSON hierarchy.
+        1. Link every visual observation to a Metadata ID [layer-ID].
         2. Use the Image for visual auditing and JSON for coordinate mapping.
-        3. The top-left corner (0,0) of your visual workspace is the top-left of the Target Container (${targetData.name}).
 
         OPERATIONAL CONSTRAINTS:
         - NO NEW ELEMENTS: Strictly forbidden unless 'GENERATIVE' method is forced by Knowledge.
         - NO DELETION: Strictly forbidden. Every layer in the JSON must remain visible and accounted for.
         - SURGICAL SWAP EXCEPTION: If 'GENERATIVE' or 'HYBRID' method is selected, you MAY identify one specific 'replaceLayerId' from the input to be replaced by the AI output.
-          * TEXTURE ISOLATION: When specifying a 'replaceLayerId' for a background swap, ensure you target the deepest specific texture layer, avoiding groups that contain foreground UI elements.
-          * The AI output will inherit the Z-index and name of the 'replaceLayerId'.
-          * This is the ONLY context where deletion/replacement is permitted.
-        - GENERATIVE PROMPT PURITY: If generating a replacement texture, your 'generativePrompt' must be explicit: "Analyze and regenerate the texture for [insert layer-ID here] only. Maintain the aesthetic style of the provided image but exclude all other container elements."
+        - GENERATIVE PROMPT PURITY: If generating a replacement texture, your 'generativePrompt' must be explicit.
         - NO CROPPING: Strictly forbidden. Use scale and position only.
         - METHOD 'GEOMETRIC': 'generativePrompt' MUST be "".
 
         JSON OUTPUT RULES:
-        - Leading reasoning must justify 'overrides' by citing specific brand constraints (if found) or expert intuition.
+        - Reasoning must explicitly mention the "Baseline" and cite how the 75/25 weighting influenced the final deltas.
         - 'knowledgeApplied' must be set to true if Knowledge rules were explicitly used.
-        - RULE ATTRIBUTION: If 'knowledgeApplied' is true, every object in the 'overrides' array MUST include a 'citedRule' string (a concise summary of the specific brand rule applied).
-        - ANCHOR REFERENCING: If a visual anchor influenced the decision, include 'anchorIndex' (integer) referencing the 0-based index of the provided visual anchor.
-        - FALLBACK LOGIC: If a conflict exists between a textual rule and a visual anchor, prioritize the textual rule but note the conflict in the 'reasoning'.
+        - RULE ATTRIBUTION: If 'knowledgeApplied' is true, every object in the 'overrides' array MUST include a 'citedRule' string.
         - Your 'overrides' must accurately map to the 'layerId' strings provided in the hierarchy.
     `;
     
@@ -699,6 +710,9 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
       const isMuted = instanceState.isKnowledgeMuted || false;
       const effectiveKnowledge = (!isMuted && activeKnowledge) ? activeKnowledge : null;
 
+      // Extract Baseline (injected in Phase 2 via getSourceData logic)
+      const baseline = sourceData.baseline;
+
       setAnalyzingInstances(prev => ({ ...prev, [index]: true }));
 
       try {
@@ -706,7 +720,8 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         if (!apiKey) throw new Error("API_KEY missing");
 
         const ai = new GoogleGenAI({ apiKey });
-        const systemInstruction = generateSystemInstruction(sourceData, targetData, history.length > 1, effectiveKnowledge);
+        // Phase 3: Pass baseline to instruction generator
+        const systemInstruction = generateSystemInstruction(sourceData, targetData, history.length > 1, effectiveKnowledge, baseline);
         // Default: Full Context
         const sourcePixelsBase64 = await extractSourcePixels(sourceData.layers as SerializableLayer[], sourceData.container.bounds);
 
@@ -741,7 +756,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
                 properties: {
                     reasoning: { 
                         type: Type.STRING,
-                        description: `MANDATORY: A professional 'Design Audit' paragraph.`
+                        description: `MANDATORY: A professional 'Design Audit' paragraph. Must cite the Baseline and 75/25 Hybrid Logic.`
                     },
                     method: { type: Type.STRING, enum: ['GEOMETRIC', 'GENERATIVE', 'HYBRID'] },
                     suggestedScale: { type: Type.NUMBER },
@@ -840,7 +855,8 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
             ...sourceData,
             aiStrategy: { ...json, isExplicitIntent },
             previewUrl: undefined,
-            targetDimensions: targetData ? { w: targetData.bounds.w, h: targetData.bounds.h } : undefined
+            targetDimensions: targetData ? { w: targetData.bounds.w, h: targetData.bounds.h } : undefined,
+            baseline // PERSISTENCE: Ensure baseline flows through updates
         };
         
         registerResolved(id, `source-out-${index}`, augmentedContext);
