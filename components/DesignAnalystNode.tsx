@@ -655,7 +655,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
           * TEXTURE ISOLATION: When specifying a 'replaceLayerId' for a background swap, ensure you target the deepest specific texture layer, avoiding groups that contain foreground UI elements.
           * The AI output will inherit the Z-index and name of the 'replaceLayerId'.
           * This is the ONLY context where deletion/replacement is permitted.
-        - GENERATIVE PROMPT PURITY: If generating a replacement texture, your 'generativePrompt' must be explicit: "Analyze and regenerate the texture for [insert layer-ID here] only. Maintain the aesthetic style of the provided image but exclude all other container objects."
+        - GENERATIVE PROMPT PURITY: If generating a replacement texture, your 'generativePrompt' must be explicit: "Analyze and regenerate the texture for [insert layer-ID here] only. Maintain the aesthetic style of the provided image but exclude all other container elements."
         - NO CROPPING: Strictly forbidden. Use scale and position only.
         - METHOD 'GEOMETRIC': 'generativePrompt' MUST be "".
 

@@ -304,10 +304,9 @@ export const ProceduralStoreProvider: React.FC<{ children: React.ReactNode }> = 
 
   // New: Specialized Registry for Preview Nodes acting as "Polished" Proxies
   const registerPreviewPayload = useCallback((nodeId: string, handleId: string, payload: TransformedPayload, renderUrl: string) => {
-    // 1. Store Render in Preview Registry (Visual State)
+    // 1. Store Render in Preview Registry (Visual State Only)
     setPreviewRegistry(prev => {
         const nodeRecord = prev[nodeId] || {};
-        // If image hasn't changed, skip
         if (nodeRecord[handleId] === renderUrl) return prev;
         return {
             ...prev,
@@ -321,10 +320,14 @@ export const ProceduralStoreProvider: React.FC<{ children: React.ReactNode }> = 
         const nodeRecord = prev[nodeId] || {};
         const currentPayload = nodeRecord[handleId];
 
-        // Ensure payload is marked polished and carries the visual preview
+        // CRITICAL DATA INTEGRITY FIX:
+        // Do NOT overwrite 'previewUrl' with 'renderUrl'.
+        // 'payload.previewUrl' contains the original, clean AI texture (ghost asset) needed for Export.
+        // 'renderUrl' is the full composite (pixels + ghost) which is only for UI display (stored in previewRegistry).
+        // If we overwrite here, the Export node will bake the entire composite image into the layer texture, causing recursion.
         const effectivePayload = { 
             ...payload, 
-            previewUrl: renderUrl, // Attach the high-fidelity render
+            // previewUrl: renderUrl, // REMOVED: Registry Corruption Source
             isPolished: true       // Enforce gate
         };
 

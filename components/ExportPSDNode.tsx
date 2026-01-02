@@ -332,6 +332,8 @@ export const ExportPSDNode = memo(({ id }: NodeProps) => {
                     if (originalLayer) {
                         // CASE A: SURGICAL SWAP (Re-use container, inject pixels)
                         // CLEAN ROOM: Explicitly strip conflicting properties
+                        // We remove 'children' because swapped layers are flattened (texture replacement)
+                        // We remove 'canvas' and 'imageData' to ensure binary data is discarded
                         const { children, canvas, imageData, ...cleanMetadata } = originalLayer as any;
 
                         newLayer = {

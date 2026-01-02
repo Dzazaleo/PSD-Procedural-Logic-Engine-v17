@@ -531,15 +531,16 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                         let layerScaleX = scale;
                         let layerScaleY = scale;
                         
-                        // SURGICAL SWAP LOGIC
+                        // SURGICAL SWAP LOGIC: Recursive Mutation
                         // If generation is active, and this layer is the designated swap target...
                         if (effectiveAllowed && strategy?.replaceLayerId === layer.id) {
                             // ...we perform an IN-PLACE mutation to 'generative' type
+                            // and force it to fill the target context
                             return {
                                 ...layer,
                                 type: 'generative', // Metamorphosis: Pixel -> Generative
                                 generativePrompt: strategy.generativePrompt, // Attach intent
-                                coords: { x: targetRect.x, y: targetRect.y, w: targetRect.w, h: targetRect.h }, // Swap usually implies filling target context
+                                coords: { x: targetRect.x, y: targetRect.y, w: targetRect.w, h: targetRect.h }, // Fill bounds
                                 transform: { scaleX: 1, scaleY: 1, offsetX: targetRect.x, offsetY: targetRect.y },
                                 children: undefined // Flatten children (texture replacement)
                             };
@@ -548,9 +549,7 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                         let override = strategy?.overrides?.find(o => o.layerId === layer.id);
 
                         // STRUCTURAL BUNDLING LOGIC
-                        // If Zero Gap is enforced and this layer matches 'Slave' criteria, force inherit Master attributes
                         if (isZeroGap && masterOverride && layer.name.match(/Frame|Divider|Border|Grid/i)) {
-                            // Replace individual override with Master's geometry to ensure lock-step
                             override = { ...masterOverride, layerId: layer.id }; 
                         }
 
@@ -594,8 +593,8 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                     }
                 }
 
-                // REMOVED: Old unshift() logic for "Added" layers. 
-                // The Surgical Swap now handles insertion via recursive replacement above.
+                // REMOVED: Legacy additive injection (unshift) is gone.
+                // Surgical swap logic inside transformLayers now handles asset placement.
                 
                 const storePayload = payloadRegistry[id]?.[`result-out-${i}`];
                 payload = {
