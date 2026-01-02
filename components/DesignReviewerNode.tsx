@@ -17,7 +17,14 @@ const DEFAULT_REVIEWER_STATE: ReviewerInstanceState = {
 const renderCurrentState = async (payload: TransformedPayload, psd: Psd): Promise<string | null> => {
     if (!payload || !psd) return null;
 
-    const { w, h } = payload.metrics.target;
+    // Use targetBounds if available, fallback to metrics (Legacy Compat)
+    const w = payload.targetBounds ? payload.targetBounds.w : payload.metrics.target.w;
+    const h = payload.targetBounds ? payload.targetBounds.h : payload.metrics.target.h;
+    
+    // Normalize coordinates from Global PSD space to Local Container space
+    const originX = payload.targetBounds ? payload.targetBounds.x : 0;
+    const originY = payload.targetBounds ? payload.targetBounds.y : 0;
+
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
@@ -34,6 +41,10 @@ const renderCurrentState = async (payload: TransformedPayload, psd: Psd): Promis
             const layer = layers[i];
             
             if (layer.isVisible) {
+                // Normalized Coordinates
+                const drawX = layer.coords.x - originX;
+                const drawY = layer.coords.y - originY;
+                
                 // 1. Draw Image Content (if standard layer)
                 if (layer.type !== 'generative' && layer.type !== 'group') {
                     const originalLayer = findLayerByPath(psd, layer.id);
@@ -43,8 +54,8 @@ const renderCurrentState = async (payload: TransformedPayload, psd: Psd): Promis
                             ctx.globalAlpha = layer.opacity;
                             ctx.drawImage(
                                 originalLayer.canvas, 
-                                layer.coords.x, 
-                                layer.coords.y, 
+                                drawX, 
+                                drawY, 
                                 layer.coords.w, 
                                 layer.coords.h
                             );
@@ -59,8 +70,8 @@ const renderCurrentState = async (payload: TransformedPayload, psd: Psd): Promis
                     ctx.fillStyle = 'rgba(192, 132, 252, 0.3)'; // Purple tint
                     ctx.strokeStyle = 'rgba(192, 132, 252, 0.8)';
                     ctx.lineWidth = 2;
-                    ctx.fillRect(layer.coords.x, layer.coords.y, layer.coords.w, layer.coords.h);
-                    ctx.strokeRect(layer.coords.x, layer.coords.y, layer.coords.w, layer.coords.h);
+                    ctx.fillRect(drawX, drawY, layer.coords.w, layer.coords.h);
+                    ctx.strokeRect(drawX, drawY, layer.coords.w, layer.coords.h);
                 }
 
                 ctx.globalAlpha = 1.0;

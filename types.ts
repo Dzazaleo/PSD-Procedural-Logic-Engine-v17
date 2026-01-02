@@ -172,6 +172,13 @@ export interface TransformedPayload {
     source: { w: number, h: number };
     target: { w: number, h: number };
   };
+  // NEW: Full bounds for coordinate normalization (local vs global space)
+  targetBounds?: {
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+  };
   requiresGeneration?: boolean;
   previewUrl?: string;
   isConfirmed?: boolean;

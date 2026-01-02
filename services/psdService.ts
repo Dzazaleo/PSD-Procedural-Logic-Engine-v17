@@ -410,10 +410,17 @@ export const findLayerByPath = (psd: Psd, pathId: string): Layer | null => {
 export const compositePayloadToCanvas = async (payload: TransformedPayload, psd: Psd): Promise<string | null> => {
     if (!payload || !psd) return null;
 
-    const { w, h } = payload.metrics.target;
+    // Use targetBounds for geometry if available (to fix origin mismatch), fallback to metrics.target
+    const width = payload.targetBounds ? payload.targetBounds.w : payload.metrics.target.w;
+    const height = payload.targetBounds ? payload.targetBounds.h : payload.metrics.target.h;
+    
+    // Origin for normalization (Global -> Local conversion)
+    const originX = payload.targetBounds ? payload.targetBounds.x : 0;
+    const originY = payload.targetBounds ? payload.targetBounds.y : 0;
+
     const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
@@ -427,15 +434,14 @@ export const compositePayloadToCanvas = async (payload: TransformedPayload, psd:
     ctx.globalAlpha = 1.0;
 
     // 3. Absolute Clear (Transparent)
-    ctx.clearRect(0, 0, w, h);
+    ctx.clearRect(0, 0, width, height);
 
-    // 4. "Safe Zone" Matte Fill
-    // Forces the output image to match target dimensions even if layers are sparse
-    // This resolves cropping issues in Object-Contain logic in preview nodes
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.5)'; // Dark Slate Safe Zone
-    ctx.fillRect(0, 0, w, h);
+    // 4. "Safe Zone" Matte Fill - Solid Slate 900
+    // Forces the output image to match target dimensions and provides visual context
+    ctx.fillStyle = '#0f172a'; // Solid Slate 900
+    ctx.fillRect(0, 0, width, height);
 
-    console.log(`[COMPOSITOR] Starting render for ${payload.layers.length} root layers. Target: ${w}x${h}`);
+    console.log(`[COMPOSITOR] Starting render for ${payload.layers.length} root layers. Target: ${width}x${height}, Origin: ${originX},${originY}`);
 
     // Optional: Pre-load the generative preview if available to use as texture
     let genImage: HTMLImageElement | null = null;
@@ -454,13 +460,10 @@ export const compositePayloadToCanvas = async (payload: TransformedPayload, psd:
 
     const drawLayers = async (layers: TransformedLayer[], depth = 0) => {
         // CHANGED: Iterate Forward (0 to Length-1) to implement Bottom-to-Top Painter's Algorithm.
-        // Index 0 is treated as the bottom-most layer, drawn first.
-        // This resolves the visual inversion where top layers were being drawn behind bottom layers.
         for (let i = 0; i < layers.length; i++) {
             const layer = layers[i];
             
             // DIAGNOSTIC FORCE OPACITY
-            // If opacity is missing or 0, force to 1.0 to rule out data errors for this diagnostic run.
             let effectiveOpacity = (typeof layer.opacity === 'number') ? layer.opacity : 1.0;
             if (effectiveOpacity === 0) {
                  effectiveOpacity = 1.0; 
@@ -478,8 +481,6 @@ export const compositePayloadToCanvas = async (payload: TransformedPayload, psd:
             // --- RECURSIVE GROUP HANDLING ---
             if (layer.type === 'group' && layer.children) {
                 // RECURSION GUARD:
-                // We STRICTLY wrap the recursive call in save/restore to prevent any state bleeding.
-                // We do NOT apply the group's opacity here, assuming children carry absolute opacity.
                 ctx.save();
                 await drawLayers(layer.children, depth + 1);
                 ctx.restore();
@@ -494,23 +495,27 @@ export const compositePayloadToCanvas = async (payload: TransformedPayload, psd:
             ctx.globalCompositeOperation = 'source-over';
 
             // 2. STRICT ALPHA APPLICATION
-            // Ensure alpha is 0.0-1.0. Do NOT scale by 255 here, as the model uses normalized floats.
             const alpha = Math.max(0, Math.min(1, effectiveOpacity));
             ctx.globalAlpha = alpha;
 
             const { x, y, w: dw, h: dh } = layer.coords;
-            console.log(`[DRAW] "${layer.name}" at x:${Math.round(x)}, y:${Math.round(y)} (${Math.round(dw)}x${Math.round(dh)})`);
+            
+            // COORDINATE NORMALIZATION: Transform Global Coords -> Local Canvas Coords
+            const drawX = x - originX;
+            const drawY = y - originY;
+            
+            console.log(`[DRAW] "${layer.name}" at global x:${Math.round(x)}, y:${Math.round(y)} -> local x:${Math.round(drawX)}, y:${Math.round(drawY)}`);
 
             // 3. DRAW
             if (layer.type === 'generative') {
                 if (genImage && payload.previewUrl) {
                     try {
-                        ctx.drawImage(genImage, x, y, dw, dh);
+                        ctx.drawImage(genImage, drawX, drawY, dw, dh);
                     } catch (e) {
-                        drawGenerativePlaceholder(ctx, x, y, dw, dh);
+                        drawGenerativePlaceholder(ctx, drawX, drawY, dw, dh);
                     }
                 } else {
-                    drawGenerativePlaceholder(ctx, x, y, dw, dh);
+                    drawGenerativePlaceholder(ctx, drawX, drawY, dw, dh);
                 }
             } 
             else {
@@ -519,15 +524,15 @@ export const compositePayloadToCanvas = async (payload: TransformedPayload, psd:
                 if (sourceLayer && sourceLayer.canvas) {
                     if (layer.transform && layer.transform.rotation) {
                         const rot = (layer.transform.rotation * Math.PI) / 180;
-                        const cx = x + dw / 2;
-                        const cy = y + dh / 2;
+                        const cx = drawX + dw / 2;
+                        const cy = drawY + dh / 2;
                         
                         ctx.translate(cx, cy);
                         ctx.rotate(rot);
                         ctx.drawImage(sourceLayer.canvas, -dw / 2, -dh / 2, dw, dh);
                     } else {
                         // Direct Draw (Standard)
-                        ctx.drawImage(sourceLayer.canvas, x, y, dw, dh);
+                        ctx.drawImage(sourceLayer.canvas, drawX, drawY, dw, dh);
                     }
                 } else {
                     console.warn(`[COMPOSITOR] Source canvas missing for layer: ${layer.name} (ID: ${layer.id})`);

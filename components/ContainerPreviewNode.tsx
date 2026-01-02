@@ -116,6 +116,10 @@ const PreviewInstanceRow = memo(({ index, nodeId }: { index: number, nodeId: str
     const layerCount = incomingPayload ? getLayerCount(incomingPayload) : 0;
     const isPolished = incomingPayload?.isPolished;
 
+    // Use safe zone bounds if available for accurate dimension readout
+    const targetW = incomingPayload ? (incomingPayload.targetBounds?.w ?? incomingPayload.metrics.target.w) : 0;
+    const targetH = incomingPayload ? (incomingPayload.targetBounds?.h ?? incomingPayload.metrics.target.h) : 0;
+
     return (
         <div className="relative border-b border-emerald-900/30 bg-slate-900/40 p-2 flex flex-col space-y-2 first:rounded-t-none">
             {/* ABSOLUTE DOCKED HANDLES (Left Edge) */}
@@ -202,7 +206,7 @@ const PreviewInstanceRow = memo(({ index, nodeId }: { index: number, nodeId: str
                     <div className="absolute inset-4 border-2 border-dashed border-emerald-500/20 rounded-sm pointer-events-none z-0">
                          {/* Pixel Dimension Readout */}
                         <span className="absolute bottom-2 left-2 bg-black/60 px-1.5 py-0.5 rounded text-[9px] font-mono text-emerald-400/70 border border-emerald-500/20 backdrop-blur-sm">
-                            {Math.round(incomingPayload.metrics.target.w)}x{Math.round(incomingPayload.metrics.target.h)}px
+                            {Math.round(targetW)}x{Math.round(targetH)}px
                         </span>
                     </div>
                  )}
