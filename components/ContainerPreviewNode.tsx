@@ -122,14 +122,20 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
   const isPolished = incomingPayload?.isPolished;
 
   return (
-    // Removed overflow-hidden from root to allow handles to extend
-    <div className={`min-w-[300px] min-h-[300px] bg-slate-900 rounded-lg shadow-2xl border font-sans flex flex-col relative transition-all group duration-500
+    // Resizable Container: Uses w-full h-full to fill ReactFlow's wrapper
+    <div className={`w-full h-full bg-slate-900 rounded-lg shadow-2xl border font-sans flex flex-col relative transition-all group duration-500
         ${error === 'BINARY_MISSING' 
             ? 'border-orange-500/50 shadow-orange-900/20' 
             : 'border-emerald-500/50 shadow-emerald-900/20 hover:border-emerald-400'
         }`}
     >
-      <NodeResizer minWidth={300} minHeight={300} isVisible={false} />
+      <NodeResizer 
+        minWidth={350} 
+        minHeight={350} 
+        isVisible={true} 
+        lineStyle={{ border: 'none' }}
+        handleStyle={{ background: 'transparent', border: 'none' }}
+      />
 
       {/* Header - Added rounded-t-lg and overflow-hidden */}
       <div className={`relative p-2 border-b flex items-center justify-between shrink-0 overflow-hidden rounded-t-lg backdrop-blur-md

@@ -108,6 +108,7 @@ const initialNodes: Node<PSDNodeData>[] = [
     type: 'containerPreview',
     position: { x: 2750, y: 350 }, // Positioned after Reviewer, before Export
     data: { fileName: null, template: null, validation: null, designLayers: null },
+    style: { width: 650, height: 500 },
   },
   {
     id: 'node-5',
