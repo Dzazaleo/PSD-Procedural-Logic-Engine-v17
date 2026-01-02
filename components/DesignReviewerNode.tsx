@@ -299,7 +299,7 @@ const ReviewerInstanceRow: React.FC<{
                     </button>
                     <div className="relative">
                         <span className="text-[7px] text-emerald-600 font-bold font-mono mr-5 tracking-wider">POLISHED_OUT</span>
-                        <Handle type="source" position={Position.Right} id={`polished-out-${index}`} className="!absolute !right-[-8px] !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !bg-white !border-2 !border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" title="Output: Aesthetic Sign-off" />
+                        <Handle type="source" position={Position.Right} id={`polished-out-${index}`} className="!absolute !-right-2 !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !bg-white !border-2 !border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] z-50" title="Output: Aesthetic Sign-off" />
                     </div>
                 </div>
             </div>

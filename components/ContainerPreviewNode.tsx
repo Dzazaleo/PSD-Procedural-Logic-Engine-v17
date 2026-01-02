@@ -160,7 +160,7 @@ const PreviewInstanceRow = memo(({ index, nodeId }: { index: number, nodeId: str
                             type="source" 
                             position={Position.Right} 
                             id={`payload-out-${index}`} 
-                            className="!absolute !right-[-12px] !top-1/2 !-translate-y-1/2 !w-2.5 !h-2.5 !rounded-full !bg-emerald-500 !border-2 !border-slate-800 shadow-[0_0_8px_rgba(16,185,129,0.5)] z-50" 
+                            className="!absolute !-right-3 !top-1/2 !-translate-y-1/2 !w-2.5 !h-2.5 !rounded-full !bg-emerald-500 !border-2 !border-slate-800 shadow-[0_0_8px_rgba(16,185,129,0.5)] z-50" 
                             title="Output: Validated Payload" 
                         />
                      </div>

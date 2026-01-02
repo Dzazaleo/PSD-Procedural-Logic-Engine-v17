@@ -1,5 +1,5 @@
 import React, { memo, useMemo, useEffect, useCallback, useState, useRef } from 'react';
-import { Handle, Position, NodeProps, useEdges, useReactFlow, useNodes } from 'reactflow';
+import { Handle, Position, NodeProps, useEdges, useReactFlow, useNodes, useUpdateNodeInternals } from 'reactflow';
 import { PSDNodeData, SerializableLayer, TransformedPayload, TransformedLayer, MAX_BOUNDARY_VIOLATION_PERCENT, LayoutStrategy } from '../types';
 import { useProceduralStore } from '../store/ProceduralContext';
 import { GoogleGenAI } from "@google/genai";
@@ -428,12 +428,11 @@ const RemapperInstanceRow = memo(({
                            type="target" 
                            position={Position.Left} 
                            id={`source-in-${instance.index}`} 
-                           className={`!w-3 !h-3 !-left-4 !border-2 z-50 transition-colors duration-200 ${
+                           className={`!absolute !-left-4 !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !border-2 !border-slate-900 z-50 transition-colors duration-200 ${
                                instance.source.ready 
                                ? '!bg-indigo-500 !border-white' 
                                : '!bg-slate-700 !border-slate-500 group-hover:!bg-slate-600'
                            }`} 
-                           style={{ top: '50%', transform: 'translateY(-50%)' }}
                            title={`Source for Instance ${instance.index}`}
                          />
                         {instance.source.ready ? instance.source.name : 'Connect Source...'}
@@ -457,12 +456,11 @@ const RemapperInstanceRow = memo(({
                            type="target" 
                            position={Position.Left} 
                            id={`target-in-${instance.index}`} 
-                           className={`!w-3 !h-3 !-left-4 !border-2 z-50 transition-colors duration-200 ${
+                           className={`!absolute !-left-4 !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !border-2 !border-slate-900 z-50 transition-colors duration-200 ${
                                instance.target.ready 
                                ? '!bg-emerald-500 !border-white' 
                                : '!bg-slate-700 !border-slate-500 group-hover:!bg-slate-600'
                            }`} 
-                           style={{ top: '50%', transform: 'translateY(-50%)' }}
                            title={`Target for Instance ${instance.index}`}
                          />
                         {instance.target.ready ? instance.target.name : 'Connect Target...'}
@@ -589,12 +587,11 @@ const RemapperInstanceRow = memo(({
                  type="source" 
                  position={Position.Right} 
                  id={`result-out-${instance.index}`} 
-                 className={`!w-3 !h-3 !-right-1.5 !border-2 transition-colors duration-300 z-50 ${
+                 className={`!absolute !-right-1.5 !top-1/2 !-translate-y-1/2 !w-3 !h-3 !rounded-full !border-2 !border-slate-900 z-50 transition-colors duration-300 ${
                      instance.payload && instance.payload.status !== 'error' 
                      ? '!bg-emerald-500 !border-white' 
                      : '!bg-slate-700 !border-slate-500'
                  }`} 
-                 style={{ top: '50%', transform: 'translateY(-50%)' }}
                  title={`Output Payload ${instance.index}`} 
               />
            </div>
@@ -619,6 +616,7 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
     const isTransitioningRef = useRef<Record<number, boolean>>({});
 
     const { setNodes } = useReactFlow();
+    const updateNodeInternals = useUpdateNodeInternals();
     const edges = useEdges();
     const nodes = useNodes();
     
@@ -632,6 +630,10 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
     useEffect(() => {
         return () => unregisterNode(id);
     }, [id, unregisterNode]);
+
+    useEffect(() => {
+        updateNodeInternals(id);
+    }, [id, instanceCount, updateNodeInternals]);
 
     useEffect(() => {
         const blobs = previousBlobsRef.current;
