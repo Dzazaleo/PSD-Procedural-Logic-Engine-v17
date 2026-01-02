@@ -218,8 +218,8 @@ const ReviewerInstanceRow: React.FC<{
                     </span>
                 </div>
                 <div className="flex items-center space-x-2">
-                    <Handle type="target" position={Position.Left} id={`payload-in-${index}`} className="!static !w-2.5 !h-2.5 !rounded-full !bg-indigo-500 !border-2 !border-slate-900" title="Input: Transformed Payload" />
-                    <Handle type="target" position={Position.Left} id={`target-in-${index}`} className="!static !w-2.5 !h-2.5 !rounded-full !bg-emerald-500 !border-2 !border-slate-900" title="Input: Target Definition" />
+                    <Handle type="target" position={Position.Left} id={`payload-in-${index}`} className="!static !w-2.5 !h-2.5 !rounded-full !bg-indigo-500 !border-2 !border-slate-800" title="Input: Transformed Payload" />
+                    <Handle type="target" position={Position.Left} id={`target-in-${index}`} className="!static !w-2.5 !h-2.5 !rounded-full !bg-emerald-500 !border-2 !border-slate-800" title="Input: Target Definition" />
                 </div>
             </div>
 
