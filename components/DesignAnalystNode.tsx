@@ -408,8 +408,11 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
     return container ? { bounds: container.bounds, name: container.name } : null;
   }, [edges, id, templateRegistry]);
 
-  // UPDATED: Surgical Vision Logic
-  // Accepts optional targetLayerId to isolate specific background/texture layers
+  // UPDATED: Surgical Vision Logic (Isolation Aware)
+  // Accepts optional targetLayerId to isolate specific background/texture layers.
+  // Logic: When targetLayerId is provided, we use the direct path to access the layer in the PSD
+  // and render ONLY that layer, bypassing the recursive 'drawLayers' loop that handles full composition.
+  // This effectively skips every other layer that does not match the ID.
   const extractSourcePixels = async (
       layers: SerializableLayer[], 
       bounds: {x: number, y: number, w: number, h: number},
@@ -429,13 +432,14 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
       // Clean Room Setup
       ctx.clearRect(0, 0, bounds.w, bounds.h);
 
-      // If isolating a specific target, we bypass the recursive list and fetch directly from PSD
+      // ISOLATION MODE: If strict isolation is requested via targetLayerId
       if (targetLayerId) {
           const targetLayer = findLayerByPath(psd, targetLayerId);
           if (targetLayer && targetLayer.canvas) {
               const dx = (targetLayer.left || 0) - bounds.x;
               const dy = (targetLayer.top || 0) - bounds.y;
               ctx.drawImage(targetLayer.canvas, dx, dy);
+              // EXPLICIT RETURN: Bypass the recursive loop to ensure no other pixels bleed in.
               return canvas.toDataURL('image/png');
           }
           // If strict targeting fails, return null to avoid dirty merged output
@@ -443,7 +447,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
           return null; 
       }
 
-      // Standard Recursive Draw (Full Composition)
+      // COMPOSITION MODE: Standard Recursive Draw (Full Context)
       const drawLayers = (layerNodes: SerializableLayer[]) => {
           for (let i = layerNodes.length - 1; i >= 0; i--) {
               const node = layerNodes[i];
@@ -651,7 +655,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
           * TEXTURE ISOLATION: When specifying a 'replaceLayerId' for a background swap, ensure you target the deepest specific texture layer, avoiding groups that contain foreground UI elements.
           * The AI output will inherit the Z-index and name of the 'replaceLayerId'.
           * This is the ONLY context where deletion/replacement is permitted.
-        - GENERATIVE PROMPT PURITY: If generating a replacement texture, your 'generativePrompt' must be explicit: "GENERATE BACKGROUND TEXTURE ONLY. DO NOT INCLUDE POTIONS, COUNTERS, OR UI ELEMENTS."
+        - GENERATIVE PROMPT PURITY: If generating a replacement texture, your 'generativePrompt' must be explicit: "Analyze and regenerate the texture for [insert layer-ID here] only. Maintain the aesthetic style of the provided image but exclude all other container objects."
         - NO CROPPING: Strictly forbidden. Use scale and position only.
         - METHOD 'GEOMETRIC': 'generativePrompt' MUST be "".
 

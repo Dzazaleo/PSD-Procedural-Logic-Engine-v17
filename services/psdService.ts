@@ -347,9 +347,6 @@ export const getCleanLayerTree = (layers: Layer[], path: string = ''): Serializa
     // Clamp to ensure float safety
     normalizedOpacity = Math.max(0, Math.min(1, normalizedOpacity));
 
-    // DIAGNOSTIC LOG (as requested)
-    console.log(`[PARSER] Layer: ${child.name} | Raw Opacity: ${child.opacity} | Mapped: ${normalizedOpacity.toFixed(2)}`);
-
     const node: SerializableLayer = {
       id: currentPath,
       name: child.name || `Layer ${index}`,
@@ -506,8 +503,10 @@ export const compositePayloadToCanvas = async (payload: TransformedPayload, psd:
             
             console.log(`[DRAW] "${layer.name}" at global x:${Math.round(x)}, y:${Math.round(y)} -> local x:${Math.round(drawX)}, y:${Math.round(drawY)}`);
 
-            // 3. DRAW
+            // 3. DRAW: SURGICAL SWAP LOGIC
+            // If the layer is generative, we MUST bypass the original layer lookup entirely.
             if (layer.type === 'generative') {
+                // Draw either the generated preview texture or a placeholder
                 if (genImage && payload.previewUrl) {
                     try {
                         ctx.drawImage(genImage, drawX, drawY, dw, dh);
@@ -519,6 +518,7 @@ export const compositePayloadToCanvas = async (payload: TransformedPayload, psd:
                 }
             } 
             else {
+                // STANDARD LAYER: Lookup pixels in original binary
                 const sourceLayer = findLayerByPath(psd, layer.id);
 
                 if (sourceLayer && sourceLayer.canvas) {

@@ -259,10 +259,12 @@ export const ExportPSDNode = memo(({ id }: NodeProps) => {
           const findGenerativeLayers = (layers: TransformedLayer[]) => {
               for (const layer of layers) {
                   // FILTER: Only process generative layers if they are CONFIRMED
-                  if (layer.type === 'generative' && layer.generativePrompt && payload.isConfirmed) {
+                  // Also include if method is 'GENERATIVE' but no prompt (unlikely but safe)
+                  if (layer.type === 'generative' && payload.isConfirmed) {
                       if (payload.previewUrl) {
                           const task = async () => {
                               try {
+                                  // Reuse the preview render as the final asset if strictly visual match desired
                                   const canvas = await base64ToCanvas(
                                       payload.previewUrl!, 
                                       layer.coords.w, 
@@ -276,7 +278,7 @@ export const ExportPSDNode = memo(({ id }: NodeProps) => {
                               }
                           };
                           generationTasks.push(task());
-                      } else {
+                      } else if (layer.generativePrompt) {
                           const task = async () => {
                               const canvas = await generateLayerImage(
                                   layer.generativePrompt!, 
@@ -329,8 +331,11 @@ export const ExportPSDNode = memo(({ id }: NodeProps) => {
                 if (asset) {
                     if (originalLayer) {
                         // CASE A: SURGICAL SWAP (Re-use container, inject pixels)
+                        // CLEAN ROOM: Explicitly strip conflicting properties
+                        const { children, canvas, imageData, ...cleanMetadata } = originalLayer as any;
+
                         newLayer = {
-                            ...originalLayer, // Inherit Blend Modes, Layer Masks (if any), etc.
+                            ...cleanMetadata, // Inherit Blend Modes, Layer Masks (if any), etc.
                             // Override Geometry & Content
                             name: metaLayer.name,
                             top: metaLayer.coords.y,
