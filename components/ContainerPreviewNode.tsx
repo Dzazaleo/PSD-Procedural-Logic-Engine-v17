@@ -122,7 +122,8 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
   const isPolished = incomingPayload?.isPolished;
 
   return (
-    <div className={`min-w-[300px] min-h-[300px] bg-slate-900 rounded-lg shadow-2xl border font-sans flex flex-col overflow-hidden transition-all group duration-500
+    // Removed overflow-hidden from root to allow handles to extend
+    <div className={`min-w-[300px] min-h-[300px] bg-slate-900 rounded-lg shadow-2xl border font-sans flex flex-col relative transition-all group duration-500
         ${error === 'BINARY_MISSING' 
             ? 'border-orange-500/50 shadow-orange-900/20' 
             : 'border-emerald-500/50 shadow-emerald-900/20 hover:border-emerald-400'
@@ -130,8 +131,8 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
     >
       <NodeResizer minWidth={300} minHeight={300} isVisible={false} />
 
-      {/* Header - High Fidelity with Noise */}
-      <div className={`relative p-2 border-b flex items-center justify-between shrink-0 overflow-hidden backdrop-blur-md
+      {/* Header - Added rounded-t-lg and overflow-hidden */}
+      <div className={`relative p-2 border-b flex items-center justify-between shrink-0 overflow-hidden rounded-t-lg backdrop-blur-md
           ${error === 'BINARY_MISSING' 
               ? 'bg-orange-950/90 border-orange-500/30' 
               : 'bg-emerald-950/90 border-emerald-500/30'
@@ -155,9 +156,10 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
          </div>
       </div>
 
-      {/* Input Handles Area - Darker, cleaner */}
+      {/* Input Handles Area - Increased height slightly to accommodate vertical spacing */}
       <div className="relative h-10 bg-slate-950 border-b border-slate-800 flex items-center px-2 justify-between">
-          {/* Docked Handles */}
+          
+          {/* Docked Absolute Handles */}
           <Handle type="target" position={Position.Left} id="payload-in" 
               className="!absolute !-left-1.5 !top-2.5 !w-3 !h-3 !rounded-full !bg-indigo-500 !border-2 !border-slate-900 z-50" 
               title="Input: Transformed Payload" 
@@ -167,13 +169,9 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
               title="Input: Target Definition" 
           />
 
-          <div className="flex items-center gap-4 pl-3">
-              <div className="flex items-center">
-                  <span className="text-[9px] text-slate-500 font-mono ml-1.5 font-bold tracking-wider">PAYLOAD</span>
-              </div>
-              <div className="flex items-center">
-                  <span className="text-[9px] text-slate-500 font-mono ml-1.5 font-bold tracking-wider">TARGET</span>
-              </div>
+          <div className="flex items-center gap-4 pl-2">
+              <span className="text-[9px] text-slate-500 font-mono font-bold tracking-wider">PAYLOAD</span>
+              <span className="text-[9px] text-slate-500 font-mono font-bold tracking-wider">TARGET</span>
           </div>
           {incomingPayload && (
               <span className="text-[9px] text-slate-400 font-mono font-medium">
@@ -254,8 +252,8 @@ export const ContainerPreviewNode = memo(({ id, data }: NodeProps<PSDNodeData>) 
           </div>
       </div>
 
-      {/* Footer */}
-      <div className="h-8 bg-slate-950 border-t border-slate-800 flex items-center justify-between px-3 shrink-0 text-[9px] font-mono font-bold tracking-wider text-slate-500">
+      {/* Footer - Added rounded-b-lg and overflow-hidden */}
+      <div className="h-8 bg-slate-950 border-t border-slate-800 flex items-center justify-between px-3 shrink-0 text-[9px] font-mono font-bold tracking-wider text-slate-500 rounded-b-lg overflow-hidden">
           <div className="flex items-center gap-3">
               {incomingPayload && (
                   <>

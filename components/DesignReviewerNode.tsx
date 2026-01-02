@@ -209,7 +209,7 @@ const ReviewerInstanceRow: React.FC<{
 
     return (
         <div className="relative border-b border-emerald-900/30 bg-slate-900/40 p-3 space-y-3">
-            {/* Docked Input Handles (Absolute Positioned) */}
+            {/* ABSOLUTE DOCKED HANDLES (Left Edge) */}
             <Handle 
                 type="target" 
                 position={Position.Left} 
@@ -225,10 +225,10 @@ const ReviewerInstanceRow: React.FC<{
                 title="Input: Target Definition" 
             />
 
-            {/* Headers */}
+            {/* Header Area */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2 pl-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981]"></div>
+                    <ScanEye className="w-3 h-3 text-emerald-500/70" /> 
                     <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">
                         {incomingPayload?.targetContainer || `Auditor ${index + 1}`}
                     </span>
@@ -473,11 +473,12 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
   };
 
   return (
-    <div className="w-[400px] bg-slate-900 rounded-lg shadow-2xl border border-emerald-500/50 font-sans flex flex-col overflow-hidden transition-all hover:shadow-emerald-900/20 hover:border-emerald-400 group">
+    // ROOT: Removed overflow-hidden to allow handles to peek out. Added relative.
+    <div className="w-[400px] bg-slate-900 rounded-lg shadow-2xl border border-emerald-500/50 font-sans flex flex-col relative transition-all hover:shadow-emerald-900/20 hover:border-emerald-400 group">
       <NodeResizer minWidth={400} minHeight={300} isVisible={false} />
       
-      {/* Header - High Fidelity with Noise Overlay */}
-      <div className="relative bg-emerald-950/80 backdrop-blur-md p-2 border-b border-emerald-500/30 flex items-center justify-between shrink-0 overflow-hidden">
+      {/* Header: Added rounded-t-lg and overflow-hidden for corner clipping */}
+      <div className="relative bg-emerald-950/80 backdrop-blur-md p-2 border-b border-emerald-500/30 flex items-center justify-between shrink-0 overflow-hidden rounded-t-lg">
          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-soft-light pointer-events-none"></div>
          <div className="flex items-center space-x-2 z-10">
            <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
@@ -505,7 +506,8 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
           ))}
       </div>
 
-      <button onClick={addInstance} className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-emerald-500 hover:text-emerald-400 text-[9px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center space-x-2 border-t border-emerald-900/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+      {/* Footer: Added rounded-b-lg and overflow-hidden for corner clipping */}
+      <button onClick={addInstance} className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-emerald-500 hover:text-emerald-400 text-[9px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center space-x-2 border-t border-emerald-900/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] rounded-b-lg overflow-hidden">
           <ArrowRight className="w-3 h-3" />
           <span>Add Audit Instance</span>
       </button>
