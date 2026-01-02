@@ -1,5 +1,5 @@
 import { readPsd, writePsd, Psd, ReadOptions, WriteOptions, Layer } from 'ag-psd';
-import { TemplateMetadata, ContainerDefinition, DesignValidationReport, ValidationIssue, SerializableLayer, ContainerContext, TransformedPayload, TransformedLayer } from '../types';
+import { TemplateMetadata, ContainerDefinition, DesignValidationReport, ValidationIssue, SerializableLayer, ContainerContext, TransformedPayload, TransformedLayer, BaselineMetrics } from '../types';
 
 // --- Procedural Palette & Theme Logic ---
 
@@ -393,6 +393,33 @@ export const findLayerByPath = (psd: Psd, pathId: string): Layer | null => {
   }
 
   return targetLayer || null;
+};
+
+/**
+ * Calculates the Geometric Baseline Projection (GBP).
+ * Determines the scale and position to perfectly center the source within the target
+ * using a Uniform Fit strategy.
+ * 
+ * @param sourceBounds The bounding box of the source content { w, h }.
+ * @param targetBounds The bounding box of the target container { x, y, w, h }.
+ * @returns BaselineMetrics object { scale, x, y }.
+ */
+export const calculateGeometricBaseline = (
+  sourceBounds: { w: number; h: number },
+  targetBounds: { x: number; y: number; w: number; h: number }
+): BaselineMetrics => {
+  // 1. Calculate Uniform Fit Scale (Min of Width/Height ratios)
+  // Ensures content fits entirely within target without cropping.
+  const scaleX = targetBounds.w / sourceBounds.w;
+  const scaleY = targetBounds.h / sourceBounds.h;
+  const scale = Math.min(scaleX, scaleY);
+
+  // 2. Calculate Centered Coordinates
+  // Origin + Half Remaining Space
+  const x = targetBounds.x + (targetBounds.w - (sourceBounds.w * scale)) / 2;
+  const y = targetBounds.y + (targetBounds.h - (sourceBounds.h * scale)) / 2;
+
+  return { scale, x, y };
 };
 
 /**

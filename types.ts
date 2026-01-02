@@ -77,12 +77,19 @@ export type RemapStrategy = 'STRETCH' | 'UNIFORM_FIT' | 'UNIFORM_FILL' | 'NONE';
 
 export interface LayerOverride {
   layerId: string;
-  xOffset: number;
-  yOffset: number;
+  xOffset: number; // Note: xOffset and yOffset are now deltas from the baseline.
+  yOffset: number; // Note: xOffset and yOffset are now deltas from the baseline.
   individualScale: number;
   rotation?: number; // Added for Reviewer Node support
   citedRule?: string; // Phase 4: Textual rule attribution
   anchorIndex?: number; // Phase 4: Visual anchor reference index
+}
+
+// GBP: Geometric Baseline Projection
+export interface BaselineMetrics {
+  scale: number;
+  x: number;
+  y: number;
 }
 
 export interface LayoutStrategy {
@@ -137,6 +144,7 @@ export interface MappingContext {
   // Explicit Target Dimensions for deterministic rendering
   targetDimensions?: { w: number, h: number };
   generationAllowed?: boolean; // Propagated gate state
+  baseline?: BaselineMetrics; // GBP: Starting geometry before AI analysis
 }
 
 export interface ValidationIssue {
