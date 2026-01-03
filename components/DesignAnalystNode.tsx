@@ -396,6 +396,100 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
     updateNodeInternals(id);
   }, [id, instanceCount, updateNodeInternals]);
 
+  // Implement missing functions
+  const updateInstanceState = useCallback((index: number, updates: Partial<AnalystInstanceState>) => {
+    setNodes((nds) => nds.map((n) => {
+        if (n.id === id) {
+            const currentInstances = n.data.analystInstances || {};
+            const oldState = currentInstances[index] || DEFAULT_INSTANCE_STATE;
+            return {
+                ...n,
+                data: {
+                    ...n.data,
+                    analystInstances: {
+                        ...currentInstances,
+                        [index]: { ...oldState, ...updates }
+                    }
+                }
+            };
+        }
+        return n;
+    }));
+  }, [id, setNodes]);
+
+  const generateDraft = useCallback(async (prompt: string, sourceRef?: string): Promise<string | null> => {
+      try {
+          const apiKey = process.env.API_KEY;
+          if (!apiKey) return null;
+          const ai = new GoogleGenAI({ apiKey });
+          
+          const parts: any[] = [];
+          if (sourceRef) {
+              const base64Data = sourceRef.includes('base64,') 
+                  ? sourceRef.split('base64,')[1] 
+                  : sourceRef;
+              parts.push({
+                  inlineData: {
+                      mimeType: 'image/png',
+                      data: base64Data
+                  }
+              });
+          }
+          parts.push({ text: prompt });
+
+          const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash-image',
+              contents: { parts },
+              config: {
+                  imageConfig: {
+                      aspectRatio: "1:1"
+                  }
+              }
+          });
+
+          let base64Data = null;
+          if (response.candidates?.[0]?.content?.parts) {
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData) {
+                    base64Data = part.inlineData.data;
+                    break;
+                }
+            }
+          }
+          
+          if (base64Data) {
+               return `data:image/png;base64,${base64Data}`;
+          }
+      } catch(e) {
+          console.error("Draft generation failed", e);
+      }
+      return null;
+  }, []);
+
+  const handleModelChange = useCallback((index: number, model: ModelKey) => {
+      updateInstanceState(index, { selectedModel: model });
+  }, [updateInstanceState]);
+
+  const handleToggleMute = useCallback((index: number) => {
+      const currentState = analystInstances[index] || DEFAULT_INSTANCE_STATE;
+      updateInstanceState(index, { isKnowledgeMuted: !currentState.isKnowledgeMuted });
+  }, [analystInstances, updateInstanceState]);
+
+  const addInstance = useCallback(() => {
+      setNodes(nds => nds.map(n => {
+          if (n.id === id) {
+              return {
+                  ...n,
+                  data: {
+                      ...n.data,
+                      instanceCount: (n.data.instanceCount || 1) + 1
+                  }
+              };
+          }
+          return n;
+      }));
+  }, [id, setNodes]);
+
   // ... (Active Container Name Logic, Title Suffix, Knowledge Discovery, Helpers) ...
   const activeContainerNames = useMemo(() => {
     const names: string[] = [];
@@ -500,134 +594,6 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
       return canvas.toDataURL('image/png');
   };
 
-  // ... (Store Sync, Action Handlers) ...
-  useEffect(() => {
-    const syntheticContainers: ContainerDefinition[] = [];
-    let canvasDims = { width: 0, height: 0 };
-
-    for (let i = 0; i < instanceCount; i++) {
-        const sourceData = getSourceData(i);
-        const targetData = getTargetData(i);
-        const instanceState = analystInstances[i] || DEFAULT_INSTANCE_STATE;
-
-        if (sourceData) {
-            const history = instanceState.chatHistory || [];
-            const hasExplicitKeywords = history.some(msg => msg.role === 'user' && /\b(generate|recreate|nano banana)\b/i.test(msg.parts[0].text));
-            
-            // Phase 2: Calculate Geometric Baseline (Grounding Truth)
-            const baseline = (sourceData.container && targetData) 
-                ? calculateGeometricBaseline(sourceData.container.bounds, targetData.bounds) 
-                : undefined;
-
-            const augmentedContext: MappingContext = {
-                ...sourceData,
-                aiStrategy: instanceState.layoutStrategy ? {
-                    ...instanceState.layoutStrategy,
-                    isExplicitIntent: hasExplicitKeywords
-                } : undefined,
-                previewUrl: undefined,
-                targetDimensions: targetData ? { w: targetData.bounds.w, h: targetData.bounds.h } : undefined,
-                baseline // Inject baseline into the resolved context
-            };
-            
-             registerResolved(id, `source-out-${i}`, augmentedContext);
-        }
-
-        if (targetData) {
-            if (canvasDims.width === 0) {
-                const edge = edges.find(e => e.target === id && e.targetHandle === `target-in-${i}`);
-                if (edge) {
-                    const t = templateRegistry[edge.source];
-                    if (t) canvasDims = t.canvas;
-                }
-            }
-            syntheticContainers.push({
-                id: `proxy-target-${i}`,
-                name: `target-out-${i}`, 
-                originalName: targetData.name,
-                bounds: targetData.bounds,
-                normalized: {
-                    x: canvasDims.width ? targetData.bounds.x / canvasDims.width : 0,
-                    y: canvasDims.height ? targetData.bounds.y / canvasDims.height : 0,
-                    w: canvasDims.width ? targetData.bounds.w / canvasDims.width : 0,
-                    h: canvasDims.height ? targetData.bounds.h / canvasDims.height : 0,
-                }
-            });
-        }
-    }
-    if (syntheticContainers.length > 0) {
-        const syntheticTemplate: TemplateMetadata = {
-            canvas: canvasDims.width > 0 ? canvasDims : { width: 1024, height: 1024 },
-            containers: syntheticContainers
-        };
-        registerTemplate(id, syntheticTemplate);
-    }
-  }, [id, instanceCount, analystInstances, getSourceData, getTargetData, registerResolved, registerTemplate, edges, templateRegistry]);
-
-  const addInstance = useCallback(() => {
-    setNodes((nds) => nds.map((n) => {
-        if (n.id === id) {
-            return { ...n, data: { ...n.data, instanceCount: (n.data.instanceCount || 0) + 1 } };
-        }
-        return n;
-    }));
-  }, [id, setNodes]);
-
-  const updateInstanceState = useCallback((index: number, updates: Partial<AnalystInstanceState>) => {
-    setNodes((nds) => nds.map((n) => {
-        if (n.id === id) {
-            const currentInstances = n.data.analystInstances || {};
-            const oldState = currentInstances[index] || DEFAULT_INSTANCE_STATE;
-            return {
-                ...n,
-                data: {
-                    ...n.data,
-                    analystInstances: {
-                        ...currentInstances,
-                        [index]: { ...oldState, ...updates }
-                    }
-                }
-            };
-        }
-        return n;
-    }));
-  }, [id, setNodes]);
-
-  const handleModelChange = (index: number, model: ModelKey) => {
-      updateInstanceState(index, { selectedModel: model });
-  };
-  
-  const handleToggleMute = (index: number) => {
-      const currentState = analystInstances[index]?.isKnowledgeMuted || false;
-      updateInstanceState(index, { isKnowledgeMuted: !currentState });
-  };
-
-  const generateDraft = async (prompt: string, sourceReference?: string): Promise<string | null> => {
-     try {
-         const apiKey = process.env.API_KEY;
-         if (!apiKey) return null;
-         const ai = new GoogleGenAI({ apiKey });
-         const parts: any[] = [];
-         if (sourceReference) {
-             const base64Data = sourceReference.includes('base64,') ? sourceReference.split('base64,')[1] : sourceReference;
-             parts.push({ inlineData: { mimeType: 'image/png', data: base64Data } });
-         }
-         parts.push({ text: `Generate a draft sketch (256x256) for: ${prompt}` });
-         const response = await ai.models.generateContent({
-             model: 'gemini-2.5-flash-image',
-             contents: { parts },
-             config: { imageConfig: { aspectRatio: "1:1" } }
-         });
-         for (const part of response.candidates?.[0]?.content?.parts || []) {
-            if (part.inlineData) { return `data:image/png;base64,${part.inlineData.data}`; }
-         }
-         return null;
-     } catch (e) {
-         console.error("Draft Generation Failed", e);
-         return null;
-     }
-  };
-
   // --- UPDATED: System Instruction with GBP Phase 3 Logic ---
   const generateSystemInstruction = (sourceData: any, targetData: any, isRefining: boolean, knowledgeContext: KnowledgeContext | null, baseline?: BaselineMetrics) => {
     const sourceW = sourceData.container.bounds.w;
@@ -665,6 +631,15 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         - Center Y: ${baseline?.y.toFixed(2) || 'N/A'}
         A Geometric Baseline (V0) has been established. Your coordinates (0,0) represent the top-left of the Target Container. 
         The baseline has already centered and scaled the content to fit (Uniform Fit).
+
+        LAW OF ABSOLUTE CONTAINMENT:
+        - The Target Container is a STRICT boundary. No pixels may bleed outside [0, 0, ${targetW}, ${targetH}].
+        - You MUST calculate 'suggestedScale' such that: (SourceWidth * suggestedScale) <= ${targetW} AND (SourceHeight * suggestedScale) <= ${targetH}.
+        - If the Baseline V0 scale creates overflow, you MUST reduce 'suggestedScale' until it fits.
+        
+        BOUNDARY AUDIT:
+        - In your 'reasoning', explicitly confirm that the final bounding box (Layer + Offset) is strictly within [0, 0, ${targetW}, ${targetH}].
+        - Do not provide xOffset or yOffset values that would push the layer edge past 0 or ${targetW} (for X) and 0 or ${targetH} (for Y).
 
         LAYER HIERARCHY (JSON):
         ${JSON.stringify(layerAnalysisData.slice(0, 40))}
@@ -712,7 +687,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         - METHOD 'GEOMETRIC': 'generativePrompt' MUST be "".
 
         JSON OUTPUT RULES:
-        - Reasoning must explicitly mention the "Baseline" and cite how the 75/25 weighting influenced the final deltas.
+        - Reasoning must explicitly mention the "Baseline" and "Boundary Audit", citing how the 75/25 weighting influenced the final deltas.
         - 'knowledgeApplied' must be set to true if Knowledge rules were explicitly used.
         - RULE ATTRIBUTION: If 'knowledgeApplied' is true, every object in the 'overrides' array MUST include a 'citedRule' string.
         - Your 'overrides' must accurately map to the 'layerId' strings provided in the hierarchy.

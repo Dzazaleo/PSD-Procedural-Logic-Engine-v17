@@ -1,7 +1,7 @@
 import { Psd } from 'ag-psd';
 import { Node, Edge } from 'reactflow';
 
-export const MAX_BOUNDARY_VIOLATION_PERCENT = 0.03;
+export const MAX_BOUNDARY_VIOLATION_PERCENT = 0;
 
 export interface ContainerDefinition {
   id: string;

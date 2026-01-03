@@ -499,6 +499,7 @@ export const DesignReviewerNode = memo(({ id, data }: NodeProps<PSDNodeData>) =>
             1. Analyze "Optical Equidistance": Check distances between layers sharing semantic boundaries (e.g., Frame vs Background, Text vs Container Edge).
             2. SNAP ENFORCEMENT: If 'ZERO_GAP_ALIGNMENT' or 'NO_GAPS' directive is active, identify any gaps > 0px between structural elements.
             3. DRIFT CORRECTION: If a gap is detected between "snapped" layers, calculate the precise xOffset/yOffset required to achieve a 0px delta. Prioritize moving the secondary layer (child) to meet the primary (parent).
+            4. ABSOLUTE CONTAINER CONSTRAINT: Flag any layer whose resulting geometry (x, y, w, h) exceeds the container [0,0, ${payload.metrics.target.w}, ${payload.metrics.target.h}] as a "CRITICAL COLLISION".
             
             GHOST IDENTITY PROTOCOL (Surgical Swap Recognition):
             1. IDENTIFY: Layers with type='generative' are "Ghost Assets" acting as the legal representative of an original layer.

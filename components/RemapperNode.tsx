@@ -554,17 +554,14 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                         let layerScaleY = baseline!.scale;
                         
                         // SURGICAL SWAP LOGIC: Recursive Mutation
-                        // If generation is active, and this layer is the designated swap target...
                         if (effectiveAllowed && strategy?.replaceLayerId === layer.id) {
-                            // ...we perform an IN-PLACE mutation to 'generative' type
-                            // and force it to fill the target context
                             return {
                                 ...layer,
-                                type: 'generative', // Metamorphosis: Pixel -> Generative
-                                generativePrompt: strategy.generativePrompt, // Attach intent
+                                type: 'generative', 
+                                generativePrompt: strategy.generativePrompt, 
                                 coords: { x: targetRect.x, y: targetRect.y, w: targetRect.w, h: targetRect.h }, // Fill bounds
                                 transform: { scaleX: 1, scaleY: 1, offsetX: targetRect.x, offsetY: targetRect.y },
-                                children: undefined // Flatten children (texture replacement)
+                                children: undefined 
                             };
                         }
                         
@@ -585,12 +582,26 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                             layerScaleY *= override.individualScale;
                         }
 
-                        const bleedY = targetRect.h * MAX_BOUNDARY_VIOLATION_PERCENT;
-                        finalY = Math.max(targetRect.y - bleedY, Math.min(finalY, targetRect.y + targetRect.h + bleedY));
+                        // STRICT CLAMPING LOGIC (Absolute Containment)
+                        // Ensure final coordinate + final dimension fits within targetRect.
+                        const finalW = layer.coords.w * layerScaleX;
+                        const finalH = layer.coords.h * layerScaleY;
+
+                        // X-Clamp: Min (Left Edge) -> Max (Right Edge - Width)
+                        // If element is wider than container, align left (or center in strict mode if logic changes)
+                        // Default strict clamp simply forces it inside or aligns to min if overflow is inevitable.
+                        const minX = targetRect.x;
+                        const maxX = targetRect.x + targetRect.w - finalW;
+                        finalX = Math.max(minX, Math.min(finalX, maxX));
+
+                        // Y-Clamp: Min (Top Edge) -> Max (Bottom Edge - Height)
+                        const minY = targetRect.y;
+                        const maxY = targetRect.y + targetRect.h - finalH;
+                        finalY = Math.max(minY, Math.min(finalY, maxY));
                         
                         return {
                             ...layer,
-                            coords: { x: finalX, y: finalY, w: layer.coords.w * layerScaleX, h: layer.coords.h * layerScaleY },
+                            coords: { x: finalX, y: finalY, w: finalW, h: finalH },
                             transform: { scaleX: layerScaleX, scaleY: layerScaleY, offsetX: finalX, offsetY: finalY },
                             children: layer.children ? transformLayers(layer.children, parentDeltaX, parentDeltaY) : undefined
                         };
@@ -606,7 +617,6 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                 // MANDATORY AUTO-CONFIRM CHECK (Client-side view prediction)
                 const isMandatory = strategy?.isExplicitIntent || strategy?.directives?.includes('MANDATORY_GEN_FILL');
                 const confirmedPrompt = confirmations[i];
-                // If mandatory, we treat it as implicitly confirmed for the purpose of generation init
                 const isConfirmed = isMandatory || (!!currentPrompt && currentPrompt === confirmedPrompt);
 
                 if (currentPrompt && effectiveAllowed) {
@@ -618,9 +628,6 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                     }
                 }
 
-                // REMOVED: Legacy additive injection (unshift) is gone.
-                // Surgical swap logic inside transformLayers now handles asset placement.
-                
                 const storePayload = payloadRegistry[id]?.[`result-out-${i}`];
                 payload = {
                     status,
@@ -639,11 +646,11 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                     generationId: storePayload?.generationId,
                     isSynthesizing: storePayload?.isSynthesizing,
                     generationAllowed: effectiveAllowed,
-                    directives: strategy?.directives, // Propagate Directives
-                    isMandatory: isMandatory, // Propagate Mandatory Flag
-                    replaceLayerId: strategy?.replaceLayerId, // Track swapped ID
-                    baseline, // Inject Baseline
-                    aiStrategy: strategy // Inject Strategy for Reviewer
+                    directives: strategy?.directives,
+                    isMandatory: isMandatory,
+                    replaceLayerId: strategy?.replaceLayerId,
+                    baseline,
+                    aiStrategy: strategy
                 };
             }
             result.push({ index: i, source: sourceData, target: targetData, payload, strategyUsed, baseline });
@@ -694,7 +701,6 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
             const storePayload = payloadRegistry[id]?.[`result-out-${idx}`];
             const hasPreview = !!(storePayload?.previewUrl);
             
-            // Check implicit mandatory confirmation
             const isMandatory = instance.payload?.isMandatory || strategy?.directives?.includes('MANDATORY_GEN_FILL');
             const needsInitialPreview = (isAwaiting || isMandatory) && hasPrompt && !hasPreview;
 
